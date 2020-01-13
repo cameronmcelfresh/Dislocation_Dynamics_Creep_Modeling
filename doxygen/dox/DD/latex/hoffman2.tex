@@ -1,0 +1,132 @@
+\href{https://idre.ucla.edu/hoffman2}{\texttt{ Hoffman2}} is the high-\/performance computer cluster at \href{http://www.ucla.edu}{\texttt{ U\+C\+LA}}. If you are using M\+O\+D\+E\+L-\/\+DD on Hoffman2, this page may contain useful information about the use of M\+O\+D\+EL.
+
+\subparagraph*{}\hypertarget{hoffman2_hoffman2_setup}{}\section{Setting up Hoffman2}\label{hoffman2_hoffman2_setup}
+\subparagraph*{}\hypertarget{hoffman2_hoffman2_login}{}\subsection{Login}\label{hoffman2_hoffman2_login}
+\begin{DoxyVerb}ssh username@hoffman2.idre.ucla.edu
+\end{DoxyVerb}
+
+
+\subparagraph*{}\hypertarget{hoffman2_hoffman2_compiler}{}\subsection{Setting up environment (only once)}\label{hoffman2_hoffman2_compiler}
+If a c++11-\/capable compiler is available (e.\+g. gcc5.\+3) add the following lines to your .bashrc to permanently set the environment \begin{DoxyVerb}module load gcc/5.3.0 > /dev/null 2>&1 
+module load intel/16.0.2 > /dev/null 2>&1
+module load openmpi
+\end{DoxyVerb}
+ Note that the second line is necessary to use the mkl-\/pardiso solver.
+
+If the desired compiler is not available as a module, install a local version of the compiler, for example in \begin{DoxyVerb}$HOME/gcc5.3
+\end{DoxyVerb}
+ Then create the module file \begin{DoxyVerb}$HOME/modulefiles/gcc5.3
+\end{DoxyVerb}
+ containing the following text\+: \begin{DoxyVerb}#%Module
+#
+set  name         "gcc5.3"
+#set  version      "5"
+#set  release      "3"
+proc ModulesHelp { } {
+    global name
+    global version
+    global release
+    puts stderr ""
+}
+module-whatis "Adds the $name to user's environment"
+module-whatis "Name        : $name"
+
+set           home              [ set env(HOME)]
+set           base_dir          $home/$name
+prepend-path  PATH              $base_dir/bin
+prepend-path  LD_LIBRARY_PATH   $base_dir/lib:$base_dir/lib64
+prepend-path     LIBRARY_PATH $base_dir/lib:$base_dir/lib64 
+prepend-path     INCLUDE $base_dir/include 
+prepend-path     MANPATH $base_dir/share/man 
+prepend-path     INFOPATH $base_dir/share/info 
+setenv       GCC_DIR $base_dir 
+setenv       GCC_BIN $base_dir/bin 
+setenv       GCC_INC $base_dir/include 
+setenv       GCC_LIB $base_dir/lib 
+\end{DoxyVerb}
+ Finally, add the following lines to .bashrc \begin{DoxyVerb}module use $HOME/modulefiles
+module load gcc5.3
+module load intel/16.0.2 > /dev/null 2>&1
+module load openmpi
+\end{DoxyVerb}
+
+
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_compile}{}\section{Compiling}\label{hoffman2_hoffma2_dd_compile}
+Compile D\+Domp with \begin{DoxyVerb}make DDomp
+\end{DoxyVerb}
+
+
+Compile D\+Dmpi with \begin{DoxyVerb}make DDmpi
+\end{DoxyVerb}
+
+
+See also the instructions in the tutorial F\+Rsource\+\_\+makefile.
+
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_interactive}{}\section{Running in interactive mode}\label{hoffman2_hoffma2_dd_interactive}
+The command used to obtain an interactive section is \href{http://hpc.ucla.edu/hoffman2/computing/sge_qrsh.php}{\texttt{ qrsh}}. The command qrsh is followed by the \char`\"{}-\/l\char`\"{} directive which allows to specify a series of parameters separated by commas. For example \begin{DoxyVerb}qrsh -l h_data=4g,h_rt=2:00:00
+\end{DoxyVerb}
+ requests one (1) interactive processor with 4Gb of memory (h\+\_\+data=4g) for 2 hours, 0 minutes, and 0 seconds (h\+\_\+rt=8\+:00\+:00). The maximum time limit is 24h, unless you are a member of a resource group. In that case the time limit is 14days, but the \char`\"{}highp\char`\"{} parameter must be used\+: \begin{DoxyVerb}qrsh -l h_data=4g,h_rt=48:00:00,highp
+\end{DoxyVerb}
+ If your request cannot be accommodated immediately but you are willing to wait indefinitely until it is eventually honored, you can append the flag \char`\"{}-\/now n\char`\"{} to the qrsh command\+: \begin{DoxyVerb}qrsh -l h_data=4g,h_rt=48:00:00,highp -now n
+\end{DoxyVerb}
+ The maximum wait time for members of resource groups is 24h.
+
+If you issue one of the previous commands, however, you still ha have one (1) processors to work with. In order to request more than one processor, we need the \char`\"{}-\/pe\char`\"{} (parallel environment) directive. The way you use the \char`\"{}-\/pe\char`\"{} directive depends on the version of the DD code that we run, as explained below.
+
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_interactive_DDomp}{}\subsection{D\+Domp}\label{hoffman2_hoffma2_dd_interactive_DDomp}
+If you compiled D\+Domp, \href{http://openmp.org}{\texttt{ Open\+MP}} is used to speed up the most computationally-\/intensive loops. Therefore, in order to achieve optimum performance, D\+Domp must be run on a shared-\/memory machine with the largest possible number of cores. In order to obtain one such machine with the qrsh command, you can use the directive \char`\"{}-\/pe shared N\char`\"{}, where \char`\"{}\+N\char`\"{} is the requested number of cores. For example\+: \begin{DoxyVerb}qrsh -l h_data=4g,h_rt=4:00:00 -pe shared 8
+\end{DoxyVerb}
+ requests 8 cores on the same node, which \char`\"{}share\char`\"{} the memory of that node. Note that Hoffman2 has 8-\/, 12-\/, and 16-\/core nodes.
+
+After the node has been obtained, you can run D\+Domp as\+: \begin{DoxyVerb}./DDomp
+\end{DoxyVerb}
+
+
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_interactive_DDmpi}{}\subsection{D\+Dmpi}\label{hoffman2_hoffma2_dd_interactive_DDmpi}
+If you compiled D\+Dmpi, \href{http://www.open-mpi.org}{\texttt{ Open-\/\+M\+PI}} is used in combination with \href{http://openmp.org}{\texttt{ Open\+MP}} to speed up the most computationally-\/intensive loops. You can then request multiple nodes (machines) on the cluster which communicate using \href{http://www.open-mpi.org}{\texttt{ Open-\/\+M\+PI}}, each of them internally using \href{http://openmp.org}{\texttt{ Open\+MP}}. Therefore, you must request \char`\"{}entire\char`\"{} nodes on the \href{https://idre.ucla.edu/hoffman2}{\texttt{ Hoffman2}} cluster, where \char`\"{}entire\char`\"{} here means that all cores on a specific machine will be reserved to run D\+Dmpi. The parallel environment to be requested via qrsh is \char`\"{}-\/pe node$\ast$\char`\"{} in combination with the \char`\"{}exclusive\char`\"{} directive. For example\+: \begin{DoxyVerb}qrsh -l h_data=4g,h_rt=3:00:00,exclusive,highp -now n -pe node* 4
+\end{DoxyVerb}
+ requests 4 nodes, for 3 hours, and from the resource group (highp). If each node has 12 cores, the total number of cores used will be 4$\ast$12=48. D\+Dmpi will then create 4 M\+PI processes (on for each node), each internally creating 12 threads.
+
+After the nodes have been obtained, it is necessary to update the environmental variables. \begin{DoxyVerb}. /u/local/bin/set_qrsh_env.sh
+\end{DoxyVerb}
+
+
+You can run D\+Dmpi using the \char`\"{}mpirun\char`\"{} command. However, in order to make sure that the correct version of \char`\"{}mpirun\char`\"{} is used, it is recommended to specify its full path using the environmental variable \$\+M\+P\+I\+\_\+\+B\+IN\+: \begin{DoxyVerb}$MPI_BIN/mpirun -pernode DDmpi
+\end{DoxyVerb}
+ where \char`\"{}\+N\char`\"{} is the number of requested nodes. The \char`\"{}-\/pernode\char`\"{} flag is an alternative to using a hostfile.
+
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_batch}{}\section{Running in batch mode}\label{hoffman2_hoffma2_dd_batch}
+\subparagraph*{}\hypertarget{hoffman2_hoffma2_dd_batch_DDomp}{}\subsection{D\+Domp}\label{hoffman2_hoffma2_dd_batch_DDomp}
+In batch mode, D\+Domp is typically used in the case that multiple jobs are run at the same time. This is called a job-\/array. Each job in the array runs in a single node, using Open\+MP.
+
+Suppose that the folder $<$\+J\+A\+R\+R\+D\+I\+R$>$ contains the Makefile and that D\+Domp is compiled in $<$\+J\+A\+R\+R\+D\+I\+R$>$. $<$\+J\+A\+R\+R\+D\+I\+R$>$ also contains subfolders , {\bfseries{, … $<$\+Z$>$, where each subfolder contains job-\/specific input files (D\+Dinput, load\+Input,…).}}
+
+{\bfseries{TO BE F\+I\+N\+I\+S\+H\+ED}}
+
+{\bfseries{\subparagraph*{}}}
+
+{\bfseries{ }}\hypertarget{hoffman2_hoffma2_dd_batch_DDmpi}{}\subsection{D\+Dmpi}\label{hoffman2_hoffma2_dd_batch_DDmpi}
+{\bfseries{ A dedicated script has been created to run D\+Dmpi on the Hoffman2 cluster in batch mode. The script, named submit\+\_\+\+D\+Dmpi.\+sh, is listed at the bottom of this page.}}
+
+{\bfseries{Before using the script, the following should be edited
+\begin{DoxyItemize}
+\item h\+\_\+rt=H\+H\+H\+:\+MM\+:SS (the time requested for the run)
+\item if only resource nodes are to be used, append the \char`\"{}highp\char`\"{} directive to the \char`\"{}-\/l\char`\"{} list
+\end{DoxyItemize}}}
+
+{\bfseries{Once the above options have been selected, use the script as follows\+: \begin{DoxyVerb}qsub -pe node* 10 submit_DDmpi.sh
+\end{DoxyVerb}
+ where, in this example, 10 is the number of requested nodes. Note that by using \char`\"{}-\/pe node$\ast$ 10\char`\"{} you are requesting 10 nodes on the cluster, each of them containing multiple cores. D\+Dmpi will then create 10 mpi processes, each of them using openmp internally to fully take advantage of multithreading.}}
+
+{\bfseries{The job should now be visible using \begin{DoxyVerb}myjob
+\end{DoxyVerb}
+}}
+
+{\bfseries{The job can be deleted using \begin{DoxyVerb}qdel <jobID>
+\end{DoxyVerb}
+}}
+
+{\bfseries{Following is the submit\+\_\+\+D\+Dmpi.\+sh script (thanks Raffaella D\textquotesingle{}Auria)\+: 
+\begin{DoxyCodeInclude}{0}
+\end{DoxyCodeInclude}
+ }}

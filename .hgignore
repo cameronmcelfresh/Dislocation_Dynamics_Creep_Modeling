@@ -1,0 +1,83 @@
+# regular expressions syntax. (See http://en.wikipedia.org/wiki/Regular_expression)
+syntax: regexp
+
+# Output Files
+[EVL]_[123456789][0123456789]*\.txt
+[ABCDFGHIJKLMOPQRSUWXYZ]_[0123456789]*\.txt
+[EVL]_[123456789][0123456789]*\.bin
+[ABCDFGHIJKLMNOPQRSTUWXYZ]_[0123456789]*\.bin
+evl_[123456789][0123456789]*\.txt
+evl_[123456789][0123456789]*\.bin
+
+
+# mesh files
+mesh.ele
+mesh.face
+mesh.neigh
+mesh.node
+
+# Files ending in ~
+[.]*\.[.]*~
+
+# use glob syntax.
+syntax: glob
+
+#CMake files
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles
+ 
+# Executable
+DDcode
+DDserial
+DDparallel
+DDomp
+DDmpi
+#DDviewer
+tetgen
+DDvtk
+microstructureGenerator
+
+# Folders
+docs/HTML
+OLD
+header_symlinks
+
+# Output Files
+*.jpg
+*.tga
+*.mpg
+*.png
+*.bmp
+
+# Valgrind files
+vgcore.*
+Testing
+
+
+# Misc Mac/Windows stuff
+._*
+.DS_Store
+Thumbs.db
+Desktop.ini
+ 
+# builds
+ 
+*.exe
+*.ex_
+ 
+# vb6
+ 
+*.SCC
+*.vbw
+*.pdb
+*.log
+*.Log
+ 
+# c-sharp
+#ProjectName/bin
+#ProjectName/obj
+*.user
+*.suo
+_ReSharper.*
+*.sln.cache

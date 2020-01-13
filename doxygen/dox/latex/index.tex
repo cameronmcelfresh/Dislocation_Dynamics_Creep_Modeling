@@ -1,0 +1,46 @@
+\hypertarget{index_introduction}{}\section{Introduction}\label{index_introduction}
+M\+O\+D\+EL is the The Mechanics of Defects Evolution Library, a collection of free software for the study of defects in materials.
+
+M\+O\+D\+EL contains the following modules\+:
+\begin{DoxyItemize}
+\item D\+D\+\_\+intro
+\item P\+IL
+\item F\+E\+M\+\_\+intro
+\item Mesh\+\_\+intro
+\item Quadrature\+\_\+intro
+\end{DoxyItemize}\hypertarget{index_installation}{}\section{Installation}\label{index_installation}
+M\+O\+D\+EL is a header-\/only library, therefore you just need to have M\+O\+D\+EL in your include path.
+
+M\+O\+D\+EL is written in C++ and is heavily object-\/oriented. In particular, some of the latest features of the C++11 standard are used. Therefore, M\+O\+D\+EL can only be compiled by C++11-\/capable compilers. The following compilers should do the job\+:
+\begin{DoxyItemize}
+\item G\+NU g++ version 4.\+8 or above (available at \href{http://gcc.gnu.org}{\texttt{ http\+://gcc.\+gnu.\+org}})
+\item I\+N\+T\+EL icc version 13.\+0.\+1 or above
+\end{DoxyItemize}
+
+In order to speed up compilation time, gcc release 5 or greater is recommended.
+
+Are you testing M\+O\+D\+EL on \href{http://www.apple.com/osx/}{\texttt{ Mac OsX}}? Then make sure you read the dedicated macosx page.\hypertarget{index_libraries}{}\subsection{External libraries}\label{index_libraries}
+The Discrete Dislocation Dynamics module of M\+O\+D\+EL requires the following external libraries\+:
+\begin{DoxyItemize}
+\item the c++ standard library
+\item the Eigen library (header only, available at \href{http://eigen.tuxfamily.org}{\texttt{ http\+://eigen.\+tuxfamily.\+org}})
+\end{DoxyItemize}
+
+In order to run M\+O\+D\+E\+L-\/\+D\+DD in parallel mode, additional libraries are needed\+:
+\begin{DoxyItemize}
+\item the openmpi protocol
+\end{DoxyItemize}\hypertarget{index_packages}{}\subsection{Other useful packages}\label{index_packages}
+Some bash scripts used for post-\/processing of pictures and videos are\+:
+\begin{DoxyItemize}
+\item \href{http://www.imagemagick.org}{\texttt{ Image\+Magick}}
+\item \href{http://www.ffmpeg.org}{\texttt{ F\+Fmpeg}}
+\end{DoxyItemize}
+
+These are standard packages on most Unix/\+Linux distributions.
+
+Meshes are generated using the following library\+:
+\begin{DoxyItemize}
+\item \href{http://tetgen.berlios.de}{\texttt{ Tet\+Gen }}
+\end{DoxyItemize}
+
+See the dedicated tetgen page for sample use. 

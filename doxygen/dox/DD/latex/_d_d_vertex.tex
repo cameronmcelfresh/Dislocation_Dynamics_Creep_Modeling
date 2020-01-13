@@ -1,0 +1,18 @@
+The structure of a Network is defined by {\bfseries{vertices}} connected by {\bfseries{edges}}. For a Dislocation\+Network, a vertex is a Dislocation\+Node, while an edge is a Dislocation\+Segment.
+
+The information necessary to construct all Dislocation\+Node (s) for the simulation time step N are stored in the file V/\+V\+\_\+\+N.\+txt (or V/\+V\+\_\+\+N.\+bin if binary output is selected, see the \mbox{\hyperlink{_d_d_input}{Dislocation Dynamics input file}}). Each line in V/\+V\+\_\+\+N.\+txt contains the properties of a distinct Dislocation\+Node. The format of each line is\+: \begin{DoxyVerb}sID Px Py Pz Tx Ty Tz ncID onBND
+\end{DoxyVerb}
+ where
+\begin{DoxyItemize}
+\item s\+ID is the Static\+ID of the Dislocation\+Node, a self-\/assigned unique positive integer that labels the node.
+\item Px Py Pz are the Cartesian coordinates of the position of the Dislocation\+Node
+\item Tx Ty Tz are the Cartesian coordinates of the parametric tangent of the Dislocation\+Node
+\item nc\+ID is the Static\+ID of the Network\+Component to which the Dislocation\+Node belongs
+\item on\+B\+ND is a boolean indicating if the Dislocaiton\+Node is on the external mesh boundary (used for postprocessing)
+\end{DoxyItemize}
+
+{\bfseries{Note}} that, when writing the initial input file, you only need to correctly assign s\+ID, Px, Py, and Pz. All other quantities can be set to zero, because they are internally re-\/computed by the code.
+
+\begin{DoxySeeAlso}{See also}
+\mbox{\hyperlink{_d_d_edge}{Dislocation Edge file}} 
+\end{DoxySeeAlso}
