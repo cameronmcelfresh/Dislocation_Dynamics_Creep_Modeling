@@ -12,7 +12,7 @@
 #include <fstream>
 #include <iomanip>
 #include <Eigen/Dense>
-#include <Eigen/Eigenvalues> // <-- the Eigen folder MUST be included in the same directory that this file is in. 
+#include <Eigen/Eigenvalues> 
 #include <DislocationStructure.h>
 //#include <Vacancies_functions.h>
 
@@ -227,14 +227,14 @@ void Vacancy::calcXjTimeStepGradient()
 		xi = Testdistribution(generator); //Sampled step distance
 
 		
-		cout << "Iteration " << iterations << endl;
-		cout << "Diffusion Coefficient = " << diffusionCoefficients[0] << endl;
-		cout << "DriftGradient = " << driftGradient << endl;
-		cout << "u = " << u << endl;
-		cout << "Guessed X = " << deltaX << endl;
-		cout << "Guessed T = " << deltaT << endl;
-		cout << "Sampled Xi = " << xi << endl;
-		cout << (abs(xi-deltaX)/deltaX)*100<<  "%" << " error" << endl << endl;
+		//cout << "Iteration " << iterations << endl;
+		//cout << "Diffusion Coefficient = " << diffusionCoefficients[0] << endl;
+		//cout << "DriftGradient = " << driftGradient << endl;
+		//cout << "u = " << u << endl;
+		//cout << "Guessed X = " << deltaX << endl;
+		//cout << "Guessed T = " << deltaT << endl;
+		//cout << "Sampled Xi = " << xi << endl;
+		//cout << (abs(xi-deltaX)/deltaX)*100<<  "%" << " error" << endl << endl;
 		
 		
 		//If the error is less than error from previous trials, reassign the best values
@@ -894,6 +894,96 @@ void runSimulation(vector<Vacancy> &vacancyArray, int steps)
 	OutGlobalTimeStepStream.close();
 }
 
+void vacRecount(vector<Vacancy> &vacancyArray, DislocationStructure DisStruct, double timeStep)
+//Function to recount the number of vacancies and add or remove vacancies to keep the original vacancy concentration
+//This function assists in nullifying any effects that may occur from change in the vacancy number due to absorption or emission
+{
+
+	std::cout <<"Checking total vacancies to ensure desired #..." << std::endl;
+
+	////Calculate the total absorption and emission rates to find the balancing rate////
+
+	double absorptionRate = RunningVacAbsorbed/totalGlobalTime; //Total absorption rate
+	double emissionRate = RunningVacEmitted/totalGlobalTime; //Total emission rate
+
+	double addingRate = (absorptionRate-emissionRate); //The rate of vacancy adding (+) or subtracting (-) that must occur to keep a constant concentration
+
+	double prob = abs(addingRate*timeStep); //Probability of adding/removing a vacancy given the current timestep
+
+	double num_of_vacs = static_cast<double>(vacancyArray.size()); //Length of the vacancy vector aka # of vacancies
+
+	std::cout << "The balancing rate for const. concentration is --> " << addingRate << " vacs/sec --> " << prob*100 + 100*(vacNum-num_of_vacs)*10/vacNum << "%" << " [adjusted]" << std::endl;
+
+	std::normal_distribution<double> VacsToAdd(addingRate*timeStep + (vacNum-num_of_vacs)*10/vacNum, pow(abs(addingRate*timeStep), 0.5)); //Noraml distribution to determine how many vacancies to add/subtract
+
+	double incrementalVacNum = VacsToAdd(generator); //Number of vacancies to add or subtract during this iteration
+
+	std::cout << "Randomly generated incrementalVacNum = " << incrementalVacNum << std::endl;
+
+	incrementalVacNum = round( incrementalVacNum ); //Round to the closest integer number after adding a percentage change
+
+	if(abs(incrementalVacNum)>0)
+		{
+	
+		std::cout << "Sampled additional vacancy number: " << incrementalVacNum << std::endl;
+
+		while(incrementalVacNum>0) //If there are too few vacancies, add more until the constantVacNum is reached
+			{
+			std::cout << vacancyArray.size() << " vacancies, adding vacancy" << std::endl;
+
+			////////Add a vacancy somewhere in the mesh and initialize it////////
+			std::uniform_real_distribution<double> L1Dist(-L1/2,L1/2);
+			std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
+			std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
+
+			double pos[3]; 
+
+			pos[0] = L1Dist(generator);	
+			pos[1] = L2Dist(generator);	
+			pos[2] = L3Dist(generator);	
+
+			Vacancy newVacancy;//Create	
+
+			vacancyArray.insert(vacancyArray.begin(),newVacancy ); //Add a vacancy to the current vector of vacancies
+
+			for(int i = 0; i<3; i++)
+				vacancyArray[0].position[i] = pos[i]*b;
+
+			vacancyArray[0].initializeVacancy(DisStruct); //initialize the vacancy!
+			
+			RunningVacIDnum++;
+			
+			vacancyArray[0].vacIDnum=RunningVacIDnum;
+
+			incrementalVacNum--; 
+
+
+			RunningBalancedVacs++; //Increase the running counter
+			}
+
+
+		while(incrementalVacNum<0 && vacancyArray.size()>1) //If there are too many vacancies, remove until the constantVacNum is reached
+			{
+			std::cout << vacancyArray.size() << " vacancies, removing vacancy" << std::endl;
+
+			std::uniform_int_distribution<> vacToRemove(0,vacancyArray.size()-1); //Uniform distribution to select a random vacancy to remove
+
+			int removedVac = vacToRemove(generator); //random vacancy number to remove
+
+			vacancyArray.erase(vacancyArray.begin()+removedVac); //Remove the vacancy 
+
+			incrementalVacNum++; 
+
+			RunningBalancedVacs--; //Decrease the running counter
+			}
+
+		}
+
+
+	std::cout <<"Total vacancies added/subtracted = " << RunningBalancedVacs << std::endl;
+
+}
+
 template <typename DislocationNetworkType>
 void singleVacancyEvent(vector<Vacancy> &vacancyArray, DislocationNetworkType& DN, long int runIDnum, DislocationStructure DisStruct)
 //Function to run the vacancy simulation step-wise
@@ -1203,6 +1293,11 @@ void singleVacancyEvent(vector<Vacancy> &vacancyArray, long int runIDnum, Disloc
 	if(useEmission==1)
 		vacancyEmission(vacancyArray, DisStruct, globalTimeStep);
 
+	/////Add or subtract vacancies to keep a constant vacancy concentration if preset////
+	if(requireConstantVacs==1)
+		vacRecount(vacancyArray,  DisStruct, globalTimeStep);
+		
+
 }
 
 
@@ -1217,7 +1312,9 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 	for(int i = 0; i<vacancyArray.size(); i++)
 			{
 				findClosestSegment(vacancyArray[i].position, DisStruct,  distanceInfo);
-
+				// distanceInfo[0] = distance to segment in b units
+				// distanceInfo[1] = nodeID1
+				// distanceInfo[2] = nodeID2
 				//std::cout << "Vac " << vacancyArray[i].vacIDnum << " closest segment is " << distanceInfo[0] << " b" << std::endl; 
 
 				//Skip the segment if it is a screw dislocation aka a connecting segment
@@ -1229,6 +1326,41 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 				if (distanceInfo[0]<distToAbsorbption)
 				//if (pow(pow(vacancyArray[i].position[0]/b, 2) +pow(vacancyArray[i].position[1]/b, 2),0.5) < distToAbsorbption)
 					{
+
+					/////////////////////////////
+					//Calculate the climb height
+					/////////////////////////////
+					double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
+
+					double segmentLength = pow(pow(DisStruct.nodePositions[distanceInfo[1]][0]-DisStruct.nodePositions[distanceInfo[2]][0],2) + 
+									pow(DisStruct.nodePositions[distanceInfo[1]][1]-DisStruct.nodePositions[distanceInfo[2]][1],2) +
+									pow(DisStruct.nodePositions[distanceInfo[1]][2]-DisStruct.nodePositions[distanceInfo[2]][2],2), 0.5);
+
+					double h = ( atomicVolumeinb*(1+volumetricStrain)/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
+
+					//Get the plane normal -- begin by getting the loop number
+					int loopIDnum;
+
+					for( auto const& [key, val] : DisStruct.nodeConnectivity)
+							{
+							if(key[0]==distanceInfo[0] || key[1]==distanceInfo[0] || key[0]==distanceInfo[1] || key[1]==distanceInfo[1])
+								loopIDnum= val[0];
+							}
+
+					double planeNormal[3]; //Plane normal in unit vector form
+
+					for( auto const& [key, val] : DisStruct.loops)
+							{
+							if(key==loopIDnum)
+								{
+									planeNormal[0] = val[3];
+									planeNormal[1] = val[4];
+									planeNormal[2] = val[5]; //Get the plane normals from the correct loop ID
+
+									break;
+								}
+							}
+
 					/////////////////////////////////////////////////////////////////////////////////////////
 					//Execute vacancy absorption and place the vacancy in a new position	
 					/////////////////////////////////////////////////////////////////////////////////////////				
@@ -1263,7 +1395,7 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 					}
 
 					/////////////////////////////////////////////////////////////////////////////////////////				
-					//Execute CLIMB of the segment that the vacancy was absorbed into - via movement of the two segment
+					//Execute CLIMB of the segment that the vacancy was absorbed into - via movement of the two segments
 					/////////////////////////////////////////////////////////////////////////////////////////				
 
 					Eigen::Matrix<double,3,1> newNodePosition(0,0,0);			
@@ -1272,9 +1404,9 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 					    {
 						if (nodeIter.first==distanceInfo[1])
 							{
-							DisStruct.nodePositions[distanceInfo[1]][0]+=DisStruct.nodePositions[distanceInfo[1]][3]*pow(10,5);
-							DisStruct.nodePositions[distanceInfo[1]][1]+=DisStruct.nodePositions[distanceInfo[1]][4]*pow(10,5);
-							DisStruct.nodePositions[distanceInfo[1]][2]+=DisStruct.nodePositions[distanceInfo[1]][5]*pow(10,5);
+							DisStruct.nodePositions[distanceInfo[1]][0]+=h*planeNormal[0];
+							DisStruct.nodePositions[distanceInfo[1]][1]+=h*planeNormal[1];
+							DisStruct.nodePositions[distanceInfo[1]][2]+=h*planeNormal[2];
 
 							newNodePosition(0) = DisStruct.nodePositions[distanceInfo[1]][0];
 							newNodePosition(1) = DisStruct.nodePositions[distanceInfo[1]][1];
@@ -1286,9 +1418,9 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 						if (nodeIter.first==distanceInfo[2])
 							{
 
-							DisStruct.nodePositions[distanceInfo[2]][0]+=DisStruct.nodePositions[distanceInfo[2]][3]*pow(10,5);
-							DisStruct.nodePositions[distanceInfo[2]][1]+=DisStruct.nodePositions[distanceInfo[2]][4]*pow(10,5);
-							DisStruct.nodePositions[distanceInfo[2]][2]+=DisStruct.nodePositions[distanceInfo[2]][5]*pow(10,5);
+							DisStruct.nodePositions[distanceInfo[2]][0]+=h*planeNormal[0];
+							DisStruct.nodePositions[distanceInfo[2]][1]+=h*planeNormal[1];
+							DisStruct.nodePositions[distanceInfo[2]][2]+=h*planeNormal[2];
 
 							newNodePosition(0) = DisStruct.nodePositions[distanceInfo[2]][0];
 							newNodePosition(1) = DisStruct.nodePositions[distanceInfo[2]][1];
@@ -1326,7 +1458,7 @@ void remesh(DislocationStructure& DisStruct)
 			continue; //To skip all the boundary segments which shouldn't be remeshed
 			}
 
-			std::cout << "Node " << key[0] << " and " << key[1] << std::endl;
+			//std::cout << "Node " << key[0] << " and " << key[1] << std::endl;
 
 			double x_dif = DisStruct.nodePositions[key[0]][0] - DisStruct.nodePositions[key[1]][0];  
 			double y_dif = DisStruct.nodePositions[key[0]][1] - DisStruct.nodePositions[key[1]][1];
@@ -1340,9 +1472,9 @@ void remesh(DislocationStructure& DisStruct)
 			int firstNode = key[0];
 			int secondNode = key[1];
 
-			std::cout << "x_dif = " << x_dif << std::endl;
-			std::cout << "y_dif = " << y_dif << std::endl;
-			std::cout << "z_dif = " << z_dif << std::endl;
+			//std::cout << "x_dif = " << x_dif << std::endl;
+			//std::cout << "y_dif = " << y_dif << std::endl;
+			//std::cout << "z_dif = " << z_dif << std::endl;
 
 
 			//First check to see if there is an angled segment, if so, add a node to make it straight
@@ -1354,7 +1486,7 @@ void remesh(DislocationStructure& DisStruct)
 					continue; //Sanity Check
 					}
 
-				std::cout << "Looping at curvature node" << std::endl;
+				//std::cout << "Looping at curvature node" << std::endl;
 
 				int newNodeNum=0;
 
@@ -1375,8 +1507,8 @@ void remesh(DislocationStructure& DisStruct)
 
 				newNodeNum = newNodeNum+1; //Make your node num value one higher than the largest value
 
-				std::cout << "(1)New node num = " << newNodeNum << std::endl;
-				std::cout << "(1)key[1] = " << secondNode << std::endl;
+				//std::cout << "(1)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(1)key[1] = " << secondNode << std::endl;
 
 				//Create and insert the new node
 				std::array<double,6> position;
@@ -1400,14 +1532,14 @@ void remesh(DislocationStructure& DisStruct)
 				position[4] = 0;
 				position[5] = 0;
 
-				std::cout << "Curvature between node "<< key[0] << " at :" << DisStruct.nodePositions[key[0]][0] << ", " << DisStruct.nodePositions[key[0]][1] << ", " << DisStruct.nodePositions[key[0]][2] << std::endl;
-				std::cout << " and node " << key[1] << " at " << DisStruct.nodePositions[key[1]][0] << ", " << DisStruct.nodePositions[key[1]][1] << ", " << DisStruct.nodePositions[key[1]][2] << std::endl;
-				std::cout << "Adding node " << newNodeNum << " at : " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
+				//std::cout << "Curvature between node "<< key[0] << " at :" << DisStruct.nodePositions[key[0]][0] << ", " << DisStruct.nodePositions[key[0]][1] << ", " << DisStruct.nodePositions[key[0]][2] << std::endl;
+				//std::cout << " and node " << key[1] << " at " << DisStruct.nodePositions[key[1]][0] << ", " << DisStruct.nodePositions[key[1]][1] << ", " << DisStruct.nodePositions[key[1]][2] << std::endl;
+				//std::cout << "Adding node " << newNodeNum << " at : " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
 
-				std::cout << "(2)New node num = " << newNodeNum << std::endl;
-				std::cout << "(2)key[1] = " << secondNode << std::endl;
+				//std::cout << "(2)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(2)key[1] = " << secondNode << std::endl;
 
-				std::cout << "Inserting node " << newNodeNum << std::endl;
+				//std::cout << "Inserting node " << newNodeNum << std::endl;
 				DisStruct.nodePositions.insert( std::make_pair(newNodeNum, position)  );
 
 				//Update the node connectivity 
@@ -1418,17 +1550,17 @@ void remesh(DislocationStructure& DisStruct)
 				nodes[0] = key[0];
 				nodes[1] = key[1];
 
-				std::cout << "Deleting segment " << nodes[0] <<"->" <<nodes[1] <<std::endl;
+				//std::cout << "Deleting segment " << nodes[0] <<"->" <<nodes[1] <<std::endl;
 				DisStruct.nodeConnectivity.erase(nodes); //erase the old connectivity value
 
 				//Insert the new connectivity values
 				std::array<int,2> connectivity;
-				//connectivity[0] = key[0];
+
 				connectivity[0] = firstNode;
 				connectivity[1] = newNodeNum;
 
-				std::cout << "(3)New node num = " << newNodeNum << std::endl;
-				std::cout << "(3)key[1] = " << secondNode << std::endl;
+				//std::cout << "(3)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(3)key[1] = " << secondNode << std::endl;
 
 				assert(key[0]!=newNodeNum); //Sanity Check
 
@@ -1436,21 +1568,20 @@ void remesh(DislocationStructure& DisStruct)
 				nodeInfo[0] = 0;
 				nodeInfo[1] = 0;
 
-				std::cout << "Adding segment " << connectivity[0] <<"->" <<connectivity[1] <<std::endl;
+				//std::cout << "Adding segment " << connectivity[0] <<"->" <<connectivity[1] <<std::endl;
 				DisStruct.nodeConnectivity.insert( std::make_pair(connectivity, nodeInfo)  );
 
 				//Second connectivity value
 				std::array<int,2> connectivity1;
 				connectivity1[0] = newNodeNum;
-				//connectivity[1] = key[1];
 				connectivity1[1] = secondNode;
 
-				std::cout << "(4)New node num = " << newNodeNum << std::endl;
-				std::cout << "(4)key[1] = " << secondNode << std::endl;
+				//std::cout << "(4)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(4)key[1] = " << secondNode << std::endl;
 
 				assert(secondNode!=newNodeNum); //Sanity Check
 
-				std::cout << "Adding segment " << connectivity1[0] <<"->" <<connectivity1[1] <<std::endl;
+				//std::cout << "Adding segment " << connectivity1[0] <<"->" <<connectivity1[1] <<std::endl;
 				DisStruct.nodeConnectivity.insert( std::make_pair(connectivity1, nodeInfo)  );
 
 
@@ -1471,23 +1602,23 @@ void remesh(DislocationStructure& DisStruct)
 					continue; //Sanity Check
 					}
 
-				std::cout << "Overlapping nodes found" << std::endl;
+				//std::cout << "Overlapping nodes found" << std::endl;
 
-				std::cout << "Node " << key[0] << " :";
-				for(int i = 0; i <3; i++)
-					{
-					std::cout << DisStruct.nodePositions[key[0]][i];
-					}
+				//std::cout << "Node " << key[0] << " :";
+				//for(int i = 0; i <3; i++)
+				//	{
+				//	std::cout << DisStruct.nodePositions[key[0]][i];
+				//	}
 				
-				std::cout << std::endl;
+				//std::cout << std::endl;
 
-				std::cout << "Node " << key[1] << " :";
-				for(int i = 0; i <3; i++)
-					{
-					std::cout << DisStruct.nodePositions[key[1]][i];
-					}
+				//std::cout << "Node " << key[1] << " :";
+				//for(int i = 0; i <3; i++)
+				//	{
+				//	std::cout << DisStruct.nodePositions[key[1]][i];
+				//	}
 										
-				std::cout << std::endl;
+				//std::cout << std::endl;
 
 				int nextNode;			
 
@@ -1521,7 +1652,6 @@ void remesh(DislocationStructure& DisStruct)
 
 				//Insert the new connectivity values
 				std::array<int,2> connectivity;
-				//connectivity[0] = key[0];
 				connectivity[0] = firstNode;
 				connectivity[1] = nextNode;
 
@@ -1755,15 +1885,11 @@ void updateNodes(DislocationStructure& DisStruct, int nodeNum1, int nodeNum2)
 		//Delete old connectivity
 		std::array<int, 2> nodes;
 
-		//nodes[0] = outOfMaxLink;
-		//nodes[1] = outOfMax;
 		nodes[0] = outOfMax;
 		nodes[1] = outOfMaxLink;
 
 		DisStruct.nodeConnectivity.erase(nodes); //erase the old connectivity value
 
-		//nodes[0] = outOfMax;
-		//nodes[1] = maxNode;
 		nodes[0] = maxNode;
 		nodes[1] = outOfMax;
 
@@ -1838,27 +1964,19 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 					//Execute CLIMB of the segment that the vacancy was absorbed into - via movement of the two segment
 					/////////////////////////////////////////////////////////////////////////////////////////
 
-					//double atomicVolume = (4/3)*3.14159*pow(atomicRadius/b, 3); //Atomic volume in b units
-					//Use the pre-determined atomic volume
-
 					double segmentLength = L1/(numNodes-1); //Individual dislocation segment length in b units
 
 					double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
 
-					double h = ( atomicVolumeinb/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
+					double h = ( atomicVolumeinb*(1+volumetricStrain)/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
 
-					DisStruct.nodePositions[distanceInfo[1]][0]+=10;
-					//DisStruct.nodePositions[distanceInfo[1]][0]+=h;
-					//DisStruct.nodePositions[distanceInfo[1]][1]+=DisStruct.nodePositions[distanceInfo[1]][4]*pow(10,5);
-					//DisStruct.nodePositions[distanceInfo[1]][2]+=DisStruct.nodePositions[distanceInfo[1]][5]*pow(10,5);
-
-					DisStruct.nodePositions[distanceInfo[2]][0]+=10;
-					//DisStruct.nodePositions[distanceInfo[2]][0]+=h;
-					//DisStruct.nodePositions[distanceInfo[2]][1]+=DisStruct.nodePositions[distanceInfo[2]][4]*pow(10,5);
-					//DisStruct.nodePositions[distanceInfo[2]][2]+=DisStruct.nodePositions[distanceInfo[2]][5]*pow(10,5);				
+					//DisStruct.nodePositions[distanceInfo[1]][0]+=10; //Incorrect climb amount - used for visalization purposes
+					DisStruct.nodePositions[distanceInfo[1]][0]+=h; //Correct Climb amount
 
 
-					//updateNodes(DisStruct, distanceInfo[1], distanceInfo[2]); //Function to check to see the node structure needs updating. 
+					//DisStruct.nodePositions[distanceInfo[2]][0]+=10; //Incorrect climb amount - used for visalization purposes
+					DisStruct.nodePositions[distanceInfo[2]][0]+=h; //Correct Climb amount
+				
 					
 					remesh(DisStruct); //Function to remesh the dislocation structure
 
@@ -1869,58 +1987,7 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 		std::cout << RunningVacAbsorbed << " total vacancies absorbed" << std::endl;
 }
 
-void vacRecount(vector<Vacancy> &vacancyArray, DislocationStructure DisStruct)
-//Function to recount the number of vacancies and add or remove vacancies to keep the original vacancy concentration
-//This function assists in nullifying any effects that may occur from change in the vacancy number due to absorption or emission
-{
 
-std::cout <<"Checking total vacancies to ensure desired #..." << std::endl;
-
-while(vacancyArray.size()<constVacNumber) //If there are too few vacancies, add more until the constantVacNum is reached
-	{
-	std::cout << vacancyArray.size() << " vacancies, adding vacancy" << std::endl;
-
-	////////Add a vacancy somewhere in the mesh and initialize it////////
-	std::uniform_real_distribution<double> L1Dist(-L1/2,L1/2);
-	std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
-	std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
-
-	double pos[3]; 
-
-	pos[0] = L1Dist(generator);	
-	pos[1] = L2Dist(generator);	
-	pos[2] = L3Dist(generator);	
-
-	Vacancy newVacancy;//Create	
-
-	vacancyArray.insert(vacancyArray.begin(),newVacancy ); //Add a vacancy to the current vector of vacancies
-
-	for(int i = 0; i<3; i++)
-		vacancyArray[0].position[i] = pos[i]*b;
-
-	vacancyArray[0].initializeVacancy(DisStruct); //initialize the vacancy!
-	
-	RunningVacIDnum++;
-	
-	vacancyArray[0].vacIDnum=RunningVacIDnum;
-
-
-
-	}
-
-
-while(vacancyArray.size()>constVacNumber) //If there are too many vacancies, remove until the constantVacNum is reached
-	{
-	std::cout << vacancyArray.size() << " vacancies, removing vacancy" << std::endl;
-
-	std::uniform_int_distribution<> vacToRemove(0,vacancyArray.size()-1); //Uniform distribution to select a random vacancy to remove
-
-	int removedVac = vacToRemove(generator); //random vacancy number to remove
-
-	vacancyArray.erase(vacancyArray.begin()+removedVac); //Absorb and remove the vacancy if vacancy emission is turned on
-	}
-
-}
 
 
 

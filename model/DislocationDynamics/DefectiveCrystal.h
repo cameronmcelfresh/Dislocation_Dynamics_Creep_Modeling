@@ -262,13 +262,18 @@ namespace model
 	//////Calculate the number of vacancies needed//////
 	if (vacancyConcentration==0) //Calculate the vacancy concentration from temperature and activation energy if not pre-set
 		{
-		double formationEnthalpy = formationEnthalpy; //Stress-independent vacancy formation energy
+		double formationEnthalpy = vacFormationEnergy; //Stress-independent vacancy formation energy
 
+		
 		vacancyConcentration = ( density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) * pow(100,3); //Temperature-dependednt vacancy concentration [vacs/m^3]
+		std::cout << "Vacancy Concentration = " << vacancyConcentration << std::endl;		
 		}
 
 	if (meshType==0)
-		vacNum = round(vacancyConcentration*L1*L2*L3*pow(b,3)); //Rectangular simulation mesh
+		{
+		vacNum = round(vacancyConcentration*pow(b,3)*L1*L2*L3); //Rectangular simulation mesh
+		std::cout << "vacNum = " << vacNum << std::endl;		
+		}
 	if (meshType==1)
 		vacNum = round(vacancyConcentration*3.1415*pow(L1*b,2)*L2*b); //Cylindrical simulation mesh
 
@@ -289,14 +294,17 @@ namespace model
 
 		}
 
-	std::cout << "Test 1" << std::endl;
+	std::cout << "Test 1 - resizing vacancies " << std::endl;
+	std::cout << vacNum << " vacancies" << std::endl;
 	vacancies.resize(vacNum); //Resize the vacancies vector to the correct size
-	std::cout << "Test 2" << std::endl;
+	std::cout << "Test 2 - resizing vacancies" << std::endl;
 	////////////////////////////////////////////////
 
-
-	DisStruct.createNodesAndSegments(numNodes,fractZOverhang, fractXOverhang); //Create the dislocation network AFTER L1, L2 and L3 have been resized (if applicable)
-
+	////Updating the physical nodes of the dislocation network after absorbing vacancies - parametric study////
+	if (useParametricStudy==1) 
+		{
+		DisStruct.createNodesAndSegments(numNodes,fractZOverhang, fractXOverhang); //Create the dislocation network AFTER L1, L2 and L3 have been resized (if applicable)
+		}
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -359,20 +367,20 @@ namespace model
 
 
 	//Dislocation arm test space
-	Eigen::Matrix<double,dim,1> p0(0,0,-500);
-	Eigen::Matrix<double,dim,1> p1(0,0,-250);
+	//Eigen::Matrix<double,dim,1> p0(0,0,-500);
+	//Eigen::Matrix<double,dim,1> p1(0,0,-250);
 	//Eigen::Matrix<double,dim,1> t(0,0,1);
 	//double length = 200;
-	Eigen::Matrix<double,dim,1> burgers(1,0,0);
-	Eigen::Matrix<double,dim,1> position(3,3,0);
+	//Eigen::Matrix<double,dim,1> burgers(1,0,0);
+	//Eigen::Matrix<double,dim,1> position(3,3,0);
 
-	StressStraight s0 = StressStraight(p0, p1, burgers);
+	//StressStraight s0 = StressStraight(p0, p1, burgers);
 
-	model::cout << "Test 0" << std::endl;
+	//model::cout << "Test 0" << std::endl;
 
-	MatrixDim M0 = s0.stress(position);
+	//MatrixDim M0 = s0.stress(position);
 
-	std::cout << M0 << std::endl;
+	//std::cout << M0 << std::endl;
 	//
 	
 	//VectorDim positionVec(50,50,50);
@@ -471,18 +479,7 @@ namespace model
 	//////////End gradient printing/////////////////////
 	////////////////////////////////////////////////////
 
-
-
-
-	double pos[3] = {1311*b,1950*b,1686*b};	
-
 	//printstress(pos, DN);
-
-
-	//Code taken from generateSTLprism.m
-	//double L1=2828*sqrt(2); //the side length of the cube, in units of Burgers vector
-	//double L2=1414*sqrt(2); //the side length of the cube, in units of Burgers vector
-	//double L3=2000*sqrt(2); //the side length of the cube, in units of Burgers vector
 
 	auto tV= std::chrono::system_clock::now();
 
@@ -498,6 +495,8 @@ namespace model
 		std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
 		std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
 	
+		double pos[3];
+
 		for(int i = 0; i<vacNum;i++)
 		{
 
@@ -508,32 +507,29 @@ namespace model
 			for(int j = 0; j<3;j++)
 				vacancies[i].position[j] = pos[j]*b;
 
-			//vacancies[i].position[0] = 1311*b;
-			//vacancies[i].position[1] = (1999-(i*1)*40)*b;
-			//vacancies[i].position[2] = 1686*b;
 
 			vacancies[i].initializeVacancy(DisStruct);
 		}
 		
 	}
-	
 
-	//if (simulationParameters.runID%DisStructUpdateFreq==0 && simulationParameters.runID>1) //Updating the DislocationStructure at the predetermined frequency
-		//{
-		//DisStruct.readNodesAndSegments(simulationParameters.runID);
-		//}
-
-	////Recount the number of vacancies to add/remove any vacancies to keep the pre-set vacancy concentration////
-	if (requireConstantVacs==1 && (simulationParameters.runID-1)%recountFreq==0 && simulationParameters.runID>1) 
+	////Populate the Dislocation Structure////
+	if (simulationParameters.runID=1 && useParametricStudy==0) 
 		{
-		vacRecount(vacancies, DisStruct);
+		DisStruct.readNodesAndSegments(simulationParameters.runID-1);
 		}
 
 
-	////Updating the physical nodes of the dislocation network after absorbing vacancies////
-	if ((simulationParameters.runID-1)%DisStructUpdateFreq==0 && simulationParameters.runID>1) 
+	////Updating the physical nodes of the dislocation network after absorbing vacancies - parametric study////
+	if ((simulationParameters.runID-1)%DisStructUpdateFreq==0 && simulationParameters.runID>1 && useParametricStudy==1) 
 		{
 		findVacancyIntersections(vacancies, DisStruct);
+		}
+
+	////Updating the physical nodes of the dislocation network after absorbing vacancies - parametric study////
+	if ((simulationParameters.runID-1)%DisStructUpdateFreq==0 && simulationParameters.runID>1 && useParametricStudy==0) 
+		{
+		findVacancyIntersections(vacancies, DisStruct, DN);
 		}
 	
 	////Print test stats - dislocation velocity and vacancy statistics////
@@ -555,12 +551,18 @@ namespace model
 		DisStruct.printevl(simulationParameters.runID);
 		}
 
-
-	////For runID>1 allow the vacancies to move!////
-	if (simulationParameters.runID>1)
+	////For runID>1 allow the vacancies to move! - parametric study////
+	if (simulationParameters.runID>1 && useParametricStudy==1)
 		{
 		std::cout << "Updating vacancy positions..." << std::endl;
 		singleVacancyEvent(vacancies,simulationParameters.runID,DisStruct);
+		}
+
+	////For runID>1 allow the vacancies to move! - regular DD////
+	if (simulationParameters.runID>1 && useParametricStudy==0)
+		{
+		std::cout << "Updating vacancy positions..." << std::endl;
+		singleVacancyEvent(vacancies, DN, simulationParameters.runID,DisStruct);
 		}
 
 	std::cout << "Vacany updates [" << (std::chrono::duration<double>(std::chrono::system_clock::now()-tV)).count() << " sec]" << std::endl << std::endl;

@@ -162,15 +162,9 @@ void print3x3(double dirCosines[][3])
 }
 
 void rotateToNewAxis(double dirCosinesMat[][3], double origVec[])
-//Funtion to adjust a vector a new 3D basis set, dictated by the transformation matrix
+//Funtion to rotate a vector a new 3D basis set, dictated by the transformation matrix
 {
 	
-	/*
-	cout << "Original Vec: ";
-	for(int i = 0; i<3; i++)
-		cout << origVec[i] << " ";
-	cout << endl;
-	*/
 
 	double tempVec[3];
 	tempVec[0] = origVec[0];
@@ -768,19 +762,22 @@ void printstress(double pos[3], DislocationNetworkType& DN)
 }
 
 void rewriteTemperature(double newTemp)
-//Function to rewrite the W material input file with the updated temperature value
-//Temperature is given in Kelvin - current function is designed to update the W material input file
+//Function to rewrite the material input file with the updated temperature value
+//Temperature is given in Kelvin - current function is designed to update whatever material was defined in vacancies_input.h
 {
 
 	using namespace std;
 
-	//Create a text file to hold the new W info called W_new, the delete the old W file and change the name of the new file
+	//Create a text file to hold the new material info called mat_new, the delete the old material file and change the name of the new file
+
+	std::string matFileString= "../../MaterialsLibrary/" + materialName + ".txt";  //Creates file name based on the current runID
 
 	ifstream InStream;
-	InStream.open("../../MaterialsLibrary/W.txt"); //Original W file
+	//InStream.open("../../MaterialsLibrary/W.txt"); //Original W file
+	InStream.open(matFileString); //Original material file
 
 	ofstream OutMaterialStream;
-	OutMaterialStream.open("../../MaterialsLibrary/W_new.txt"); //W_new file to hold new W info
+	OutMaterialStream.open("../../MaterialsLibrary/temp_new.txt"); //temp new file to hold new material+temp info
 
 	string temp;
 	string Indicator = "T="; //The last word that is written before the temperature line in the 	
@@ -792,7 +789,6 @@ void rewriteTemperature(double newTemp)
 
 			OutMaterialStream << "T=" << newTemp << ";			# [K]		temperature";
 
-			//InStream.ignore(256, '\n'); //Skip the next 2 /n markers
 		}
 		else
 		{
@@ -806,18 +802,78 @@ void rewriteTemperature(double newTemp)
 	InStream.close(); 
 
 
-	//Delete the old W material file
-	remove("../../MaterialsLibrary/W.txt");
 
-	//Rename the W_new file to have the name W
-	char oldname[] = "../../MaterialsLibrary/W_new.txt";
-	char newname[] = "../../MaterialsLibrary/W.txt";
+
+	//Get the name of the old material file - to be used in the renaming
+	char oldname[] = "../../MaterialsLibrary/temp_new.txt";
+	char newname[matFileString.length()+1]; //= "../../MaterialsLibrary/W.txt";
+
+	strcpy(newname, matFileString.c_str()); //Copy the filename over
+
+	remove(newname); //Delete the old material file that does NOT have the updated temperature
 	
-	//Deletes the file if exists 
+	//Rename the temp file to be the main mat file -- including the updated temperature
 	if (rename(oldname, newname) != 0)
 		perror("Error renaming material file\n");
 	else
 		std::cout << "Material file renamed successfully\n";
+	
+	
+}
+
+
+void rewriteDD(double Nsteps)
+//Function to rewrite DD.txt input file with a new Nsteps value - to speed up low temperature simulations and allow for longer time for high temp simulations 
+{
+
+	using namespace std;
+
+	//Create a DD_temp.txt file, the delete the old DD.txt files and changea the name of the new file with the updated Nsteps value
+
+	//std::string DDFileString= "/inputFiles/DD.txt";  //Filename 
+
+	ifstream InStream;
+	InStream.open("./inputFiles/DD.txt"); //Open the original DD.txt file
+
+	ofstream OutDDStream;
+	OutDDStream.open("./inputFiles/DD_temp.txt"); //temp new file to hold new Nsteps
+
+	string wordline;
+	string Indicator = "Nsteps"; //The last word that is written before the Nsteps value	
+	
+	while (std::getline(InStream, wordline) ) //Write the new base file
+	{
+		if (wordline.find(Indicator) != std::string::npos)
+		{
+
+			OutDDStream << "Nsteps = " << Nsteps << ";	# total number of simulation steps";
+
+		}
+		else
+		{
+			OutDDStream << wordline;
+		}
+
+		OutDDStream << "\n";
+	}
+
+	OutDDStream.close();
+	InStream.close(); 
+
+
+	//Get the name of the old material file - to be used in the renaming
+	//char oldname[] = "../../MaterialsLibrary/temp_new.txt";
+	//char newname[matFileString.length()+1]; //= "../../MaterialsLibrary/W.txt";
+
+	//strcpy(newname, matFileString.c_str()); //Copy the filename over
+
+	remove("./inputFiles/DD.txt"); //Delete the old DD.txt file that does NOT have the updated Nsteps
+	
+	//Rename the DD file file to be the main mat file -- including the updated temperature
+	if (rename("./inputFiles/DD_temp.txt", "./inputFiles/DD.txt") != 0)
+		perror("Error renaming DD.txt file - error updating Nsteps\n");
+	else
+		std::cout << "DD.txt file renamed successfully - Nsteps updated\n";
 	
 	
 }
@@ -830,6 +886,7 @@ void resetRunningVariables()
 	RunningLastVacNumber = 0; 
 	RunningVacEmitted= 0;
 	RunningLastVacEmitted=0; 
+	RunningBalancedVacs = 0; 
 	RunningVacIDnum = 0; 
 	totalGlobalTime = 0; 
 	lastTotalGlobalTime = 0; 

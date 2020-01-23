@@ -27,7 +27,7 @@ public:
 	//No constructor needed at the moment
 
 	std::map<int, std::array<double, 6>> nodePositions; //NODES Key: nodeID, value: node position [0-2], nodal velocities [3-5]
-	std::map<int, std::array<double, 6>> loops; //LOOPS Key: loopID, value[0-2]: burgers vector ,value[3-6]: plane normal
+	std::map<int, std::array<double, 6>> loops; //LOOPS Key: loopID, value[0-2]: burgers vector ,value[3-5]: plane normal
 	std::map<std::array<int, 2>, std::array<int, 2>> nodeConnectivity; //CONNECTIVITY Key: Connectivity, value[0] = loopnumber, value[1] = bool for if it is a boundary link or not (1=boundary link, 0=internal link
 
 	int meshType; //Defines what geometry of mesh we are using. meshType=0 is a cylindrical mesh, meshType=1 is a prisim mesh
@@ -465,50 +465,42 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 	lastTotalGlobalTime = totalGlobalTime; //Reset the marker for the last global time calculated
 
 
-	/*
-	double totalAreaMoved = 0;
-
-	//Loop through the segments to extract the area swept out -> calculate distance traveled
-	for( auto const& [key, val] : DisStruct.nodeConnectivity )
-	{
-		if(val[1]==1) //Ignore the segment if it is a boundary segment
-			continue;
-
-		double x_dif = DisStruct.nodePositions[key[0]][0] - DisStruct.nodePositions[key[1]][0];  
-		double z_dif = abs(DisStruct.nodePositions[key[0]][2] - DisStruct.nodePositions[key[1]][2]);
-
-		if(x_dif>0) //Ignore all screw connecting segments
-			continue;
-
-		//totalAreaMoved = totalAreaMoved + DisStruct.nodePositions[key[0]][0]*z_dif; //Calculate the total area swept out the segment
-		totalAreaMoved = totalAreaMoved + DisStruct.nodePositions[key[0]][0]*z_dif; //Calculate the total area swept out the segment
-	}
-	*/
-
-	////////Calculate the total and incremental distance moved by using the number of vacancies absorbed and emitted//////
-	double segmentLength = L1/(numNodes-1); //Individual dislocation segment length in b units
+	////////Calculate the total and incremental distance moved by using the number of vacancies absorbed and emitted//////////
+	//OutStatsStream << "L1="<< L1 << " " ;
 
 	double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
+	//OutStatsStream << "atomicVolumeinB="<< atomicVolumeinb << " " ;
 
-	double h = ( atomicVolumeinb/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy in one segemnet
+	double h = ( atomicVolumeinb*(1+volumetricStrain)/ L1); //Climb height in b units according to volume swept out by absorption of one vacancy in the WHOLE line
+	//OutStatsStream << "h="<< h << " " ;
 
-	double totalDistanceMoved = (RunningVacAbsorbed-RunningVacEmitted)*h/(numNodes-1); //Normalize the total area swept out to the entire length of the segment
+	double vacDifference = (RunningVacAbsorbed-RunningVacEmitted);
+	//OutStatsStream << "vacDifference="<< vacDifference << " " ;
 
-	//double totalDistanceMoved = totalAreaMoved/L1; //Normalize the total area swept out to the entire length of the segment
+	double totalDistanceMoved = vacDifference*h; ///(numNodes-1); //Normalize the total area swept out to the entire length of the segment
+	//OutStatsStream << "totalDistanceMoved[b]="<< totalDistanceMoved << " " ;
+	//OutStatsStream << "totalDistanceMoved[m]="<< totalDistanceMoved*b << " " ;
+
 
 	double totalDislocationVelocity = totalDistanceMoved*b/totalGlobalTime; //Calculate the total average dislocation velocity in ABSOLUTE UNITS
 
 	//Calculate instantaneous dislocation velocity
 	double incrementalDislocationDistance = (incrementalVacsAbsorbed - incrementalVacsEmitted)*h/(numNodes-1);;	
 	double incrementalDislocationVelocity = incrementalDislocationDistance*b/incrementalTimeStep; //Incremental dislocation velocity in ABSOLUTE UNITS
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//lastDistanceMoved = totalDistanceMoved; //Update the last distance moved
 
 
 	////////Print all statistics consistent across ALL trials////////
 
 	//Print all the variables describing the simulation state (temp, concentration, runID, applied stress, etc.)//
 	OutStatsStream << Temp << " " << vacancyConcentration << " " << runID << " ";
+
+	double formationEnthalpy = vacFormationEnergy - appliedPressure*(1+volumetricStrain)*atomicVolume; //Stress-dependent vacancy formation energy
+
+	double thermalVacancyConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass )  * pow(100,3); //Stress-independent thermal vacancy concentration [vac/m^3]
+
+	OutStatsStream << vacancyConcentration/thermalVacancyConcentration << " "; //Print the vacancy concentration multiplier
 
 	if(useStress==1) //If an applied stress is used, print the stress values
 		OutStatsStream << appliedPressure << " ";
@@ -520,7 +512,17 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 	//Print all the total # vacancies absorbed, # vacancies absorbed during the last step, total global time, time since last printing, total dislcoation velocity, and incremental dislocation velocity
 	OutStatsStream << RunningVacAbsorbed << " " << incrementalVacsAbsorbed << " "; 
 	OutStatsStream << RunningVacEmitted << " " << incrementalVacsEmitted << " "; 
-	OutStatsStream << totalGlobalTime << " " << incrementalTimeStep << " " << totalDislocationVelocity << " " << incrementalDislocationVelocity << " ";
+
+	if(requireConstantVacs==1)
+		OutStatsStream << RunningBalancedVacs << " " ;
+
+	if (dynamicBoxResizing==1)//Print the total number of vacancies
+		OutStatsStream << constVacNumber+RunningVacEmitted-RunningVacAbsorbed+RunningBalancedVacs << " "; 
+	else
+		OutStatsStream << vacNum+RunningVacEmitted-RunningVacAbsorbed+RunningBalancedVacs << " "; 
+		
+
+	OutStatsStream << totalGlobalTime << " " << incrementalTimeStep << " " << totalDislocationVelocity << " " << incrementalDislocationVelocity << " "; //Print the total time, timestep, and dislcoation velocities
 	
 	OutStatsStream << std::endl;
 	
@@ -535,6 +537,7 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 
 		OutStatsHeaderStream << "Temperature [K]" << std::endl;
 		OutStatsHeaderStream << "Vacancy_Concentration [vacs/m^3]" << std::endl;
+		OutStatsHeaderStream << "Concentration_Multiplier [vac_conc/thermal_vac_conc]" << std::endl;
 		OutStatsHeaderStream << "runID" << std::endl;
 
 		if(useStress==1) //If an applied stress is used
@@ -547,6 +550,12 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 		OutStatsHeaderStream << "Incremental_Vacancies_Absorbed [#_vac]" << std::endl;
 		OutStatsHeaderStream << "Total_Vacancies_Emitted [#_vac]" << std::endl;
 		OutStatsHeaderStream << "Incremental_Vacancies_Emitted [#_vac]" << std::endl;
+
+		if(requireConstantVacs==1) //Output the total number of vacancies the simulatin added/subtracted to keep a constant concentration
+			OutStatsHeaderStream <<"Total_Vacancies_Added_For_Const_Concentration [vacs]" << std::endl;
+
+			
+		OutStatsHeaderStream << "Number_of_Vacs [vacs]" << std::endl;
 		OutStatsHeaderStream << "Total_Time [s]" << std::endl;
 		OutStatsHeaderStream << "Incremental_Time [s]" << std::endl;
 		OutStatsHeaderStream << "Total_Avg_Dislocation_Velocity [m/s]" << std::endl;
@@ -561,6 +570,8 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 void remeshEmission(DislocationStructure& DisStruct)
 //Function to remesh the dislocation structure after an emission event
 {
+
+	std::cout << "Remeshing dislocation structure nodes..." << std::endl;
 
 	int isMeshed = 0;
 
@@ -579,7 +590,7 @@ void remeshEmission(DislocationStructure& DisStruct)
 			continue; //To skip all the boundary segments which shouldn't be remeshed
 			}
 
-			std::cout << "Node " << key[0] << " and " << key[1] << std::endl;
+			//std::cout << "Node " << key[0] << " and " << key[1] << std::endl;
 
 			double x_dif = DisStruct.nodePositions[key[0]][0] - DisStruct.nodePositions[key[1]][0];  
 			double y_dif = DisStruct.nodePositions[key[0]][1] - DisStruct.nodePositions[key[1]][1];
@@ -593,9 +604,9 @@ void remeshEmission(DislocationStructure& DisStruct)
 			int firstNode = key[0];
 			int secondNode = key[1];
 
-			std::cout << "x_dif = " << x_dif << std::endl;
-			std::cout << "y_dif = " << y_dif << std::endl;
-			std::cout << "z_dif = " << z_dif << std::endl;
+			//std::cout << "x_dif = " << x_dif << std::endl;
+			//std::cout << "y_dif = " << y_dif << std::endl;
+			//std::cout << "z_dif = " << z_dif << std::endl;
 
 
 			//First check to see if there is an angled segment, if so, add a node to make it straight
@@ -607,7 +618,7 @@ void remeshEmission(DislocationStructure& DisStruct)
 					continue; //Sanity Check
 					}
 
-				std::cout << "Looping at curvature node" << std::endl;
+				//std::cout << "Looping at curvature node" << std::endl;
 
 				int newNodeNum=0;
 
@@ -628,8 +639,8 @@ void remeshEmission(DislocationStructure& DisStruct)
 
 				newNodeNum = newNodeNum+1; //Make your node num value one higher than the largest value
 
-				std::cout << "(1)New node num = " << newNodeNum << std::endl;
-				std::cout << "(1)key[1] = " << secondNode << std::endl;
+				//std::cout << "(1)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(1)key[1] = " << secondNode << std::endl;
 
 				//Create and insert the new node
 				std::array<double,6> position;
@@ -653,14 +664,14 @@ void remeshEmission(DislocationStructure& DisStruct)
 				position[4] = 0;
 				position[5] = 0;
 
-				std::cout << "Curvature between node "<< key[0] << " at :" << DisStruct.nodePositions[key[0]][0] << ", " << DisStruct.nodePositions[key[0]][1] << ", " << DisStruct.nodePositions[key[0]][2] << std::endl;
-				std::cout << " and node " << key[1] << " at " << DisStruct.nodePositions[key[1]][0] << ", " << DisStruct.nodePositions[key[1]][1] << ", " << DisStruct.nodePositions[key[1]][2] << std::endl;
-				std::cout << "Adding node " << newNodeNum << " at : " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
+				//std::cout << "Curvature between node "<< key[0] << " at :" << DisStruct.nodePositions[key[0]][0] << ", " << DisStruct.nodePositions[key[0]][1] << ", " << DisStruct.nodePositions[key[0]][2] << std::endl;
+				//std::cout << " and node " << key[1] << " at " << DisStruct.nodePositions[key[1]][0] << ", " << DisStruct.nodePositions[key[1]][1] << ", " << DisStruct.nodePositions[key[1]][2] << std::endl;
+				//std::cout << "Adding node " << newNodeNum << " at : " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
 
-				std::cout << "(2)New node num = " << newNodeNum << std::endl;
-				std::cout << "(2)key[1] = " << secondNode << std::endl;
+				//std::cout << "(2)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(2)key[1] = " << secondNode << std::endl;
 
-				std::cout << "Inserting node " << newNodeNum << std::endl;
+				//std::cout << "Inserting node " << newNodeNum << std::endl;
 				DisStruct.nodePositions.insert( std::make_pair(newNodeNum, position)  );
 
 				//Update the node connectivity 
@@ -671,7 +682,7 @@ void remeshEmission(DislocationStructure& DisStruct)
 				nodes[0] = key[0];
 				nodes[1] = key[1];
 
-				std::cout << "Deleting segment " << nodes[0] <<"->" <<nodes[1] <<std::endl;
+				//std::cout << "Deleting segment " << nodes[0] <<"->" <<nodes[1] <<std::endl;
 				DisStruct.nodeConnectivity.erase(nodes); //erase the old connectivity value
 
 				//Insert the new connectivity values
@@ -680,8 +691,8 @@ void remeshEmission(DislocationStructure& DisStruct)
 				connectivity[0] = firstNode;
 				connectivity[1] = newNodeNum;
 
-				std::cout << "(3)New node num = " << newNodeNum << std::endl;
-				std::cout << "(3)key[1] = " << secondNode << std::endl;
+				//std::cout << "(3)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(3)key[1] = " << secondNode << std::endl;
 
 				assert(key[0]!=newNodeNum); //Sanity Check
 
@@ -689,21 +700,20 @@ void remeshEmission(DislocationStructure& DisStruct)
 				nodeInfo[0] = 0;
 				nodeInfo[1] = 0;
 
-				std::cout << "Adding segment " << connectivity[0] <<"->" <<connectivity[1] <<std::endl;
+				//std::cout << "Adding segment " << connectivity[0] <<"->" <<connectivity[1] <<std::endl;
 				DisStruct.nodeConnectivity.insert( std::make_pair(connectivity, nodeInfo)  );
 
 				//Second connectivity value
 				std::array<int,2> connectivity1;
 				connectivity1[0] = newNodeNum;
-				//connectivity[1] = key[1];
 				connectivity1[1] = secondNode;
 
-				std::cout << "(4)New node num = " << newNodeNum << std::endl;
-				std::cout << "(4)key[1] = " << secondNode << std::endl;
+				//std::cout << "(4)New node num = " << newNodeNum << std::endl;
+				//std::cout << "(4)key[1] = " << secondNode << std::endl;
 
 				assert(secondNode!=newNodeNum); //Sanity Check
 
-				std::cout << "Adding segment " << connectivity1[0] <<"->" <<connectivity1[1] <<std::endl;
+				//std::cout << "Adding segment " << connectivity1[0] <<"->" <<connectivity1[1] <<std::endl;
 				DisStruct.nodeConnectivity.insert( std::make_pair(connectivity1, nodeInfo)  );
 
 
@@ -724,23 +734,23 @@ void remeshEmission(DislocationStructure& DisStruct)
 					continue; //Sanity Check
 					}
 
-				std::cout << "Overlapping nodes found" << std::endl;
+				//std::cout << "Overlapping nodes found" << std::endl;
 
-				std::cout << "Node " << key[0] << " :";
-				for(int i = 0; i <3; i++)
-					{
-					std::cout << DisStruct.nodePositions[key[0]][i];
-					}
+				//std::cout << "Node " << key[0] << " :";
+				//for(int i = 0; i <3; i++)
+				//	{
+				//	std::cout << DisStruct.nodePositions[key[0]][i];
+				//	}
 				
-				std::cout << std::endl;
+				//std::cout << std::endl;
 
-				std::cout << "Node " << key[1] << " :";
-				for(int i = 0; i <3; i++)
-					{
-					std::cout << DisStruct.nodePositions[key[1]][i];
-					}
+				//std::cout << "Node " << key[1] << " :";
+				//for(int i = 0; i <3; i++)
+				//	{
+				//	std::cout << DisStruct.nodePositions[key[1]][i];
+				//	}
 										
-				std::cout << std::endl;
+				//std::cout << std::endl;
 
 				int nextNode;			
 
@@ -794,9 +804,7 @@ void remeshEmission(DislocationStructure& DisStruct)
 			}
 
 			
-
 			//If you successfully make it out without needed to remesh, end the loop
-
 			if(isMeshed==0)
 				{
 				break;	//Sanity check
@@ -825,15 +833,15 @@ void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruc
 		for( auto const& [key, val] : DisStruct.nodeConnectivity) //Loop through the dislocation segments and randomly select an edge segment
 				{
 
-					if(key[0]==0 || key[1]==(numNodes-1) ) //Skip emission from the first or last segment, for now. 
-						{
-						std::cout << " Test 1" << std::endl;
-						continue;
-						}
+					//if(key[0]==0 || key[1]==(numNodes-1) ) //Skip emission from the first or last segment, for now. 
+						//{
+						//std::cout << " Test 1" << std::endl;
+						//continue;
+						//}
 
 					if(key[0]==key[1])
 						{
-						std::cout << " Test 2" << std::endl;
+						//std::cout << " Test 2" << std::endl;
 						continue; //Sanity Check
 						}
 
@@ -841,12 +849,12 @@ void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruc
 
 					if( (z_dif==0) || (val[1]==1) ) //Skip through until a proper edge segment is randomly selected
 						{
-						std::cout << " Test 3" << std::endl;
+						//std::cout << " Test 3" << std::endl;
 						continue;
 						}
 
 					double randomChance = ZeroOnedistribution(generator);
-					std::cout << "Selection prob = " << probOfSelection << " and chance of " << randomChance << std::endl;
+					//std::cout << "Selection prob = " << probOfSelection << " and chance of " << randomChance << std::endl;
 
 					if( probOfSelection>randomChance ) //Select a segment with a uniform probability across all straight edge segments
 						{
@@ -857,21 +865,21 @@ void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruc
 						std::cout << "Selected node " << key[0] << " and node " << key[1] << " to negatively climb" << std::endl;
 
 
-						std::cout << "Node " << key[0] << " :";
-						for(int i = 0; i <3; i++)
-							{
-							std::cout << DisStruct.nodePositions[key[0]][i] << " ";
-							}
+						//std::cout << "Node " << key[0] << " :";
+						//for(int i = 0; i <3; i++)
+						//	{
+						//	std::cout << DisStruct.nodePositions[key[0]][i] << " ";
+						//	}
 						
-						std::cout << std::endl;
+						//std::cout << std::endl;
 
-						std::cout << "Node " << key[1] << " :";
-						for(int i = 0; i <3; i++)
-							{
-							std::cout << DisStruct.nodePositions[key[1]][i] << " ";
-							}
+						//std::cout << "Node " << key[1] << " :";
+						//for(int i = 0; i <3; i++)
+						//	{
+						//	std::cout << DisStruct.nodePositions[key[1]][i] << " ";
+						//	}
 
-						std::cout << std::endl;
+						//std::cout << std::endl;
 
 						isEmitted = 1; //Set isEmitted to 1 so the while loop will be exitted
 
@@ -880,34 +888,34 @@ void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruc
 						}
 					else
 						{
-						std:cout <<"Nodes skipped " << std::endl;
+						//std:cout <<"Nodes skipped " << std::endl;
 						}
 
 				}
 		}	
 
 		
-		/////////////////////////////////////////////////////////////////////////////////////////				
-		//Execute NEGATIVE CLIMB of the segment that the vacancy was absorbed into - via movement of the two segment
-		/////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////				
+	//Execute NEGATIVE CLIMB of the segment that the vacancy was absorbed into - via movement of the two segment
+	/////////////////////////////////////////////////////////////////////////////////////////
 
-		//double atomicVolume = (4/3)*3.14159*pow(atomicRadius/b, 3); //Atomic volume in b units
-		//Use the pre-determined atomic volume
-		double segmentLength = L1/(numNodes-1); //Individual dislocation segment length in b units
+	//double atomicVolume = (4/3)*3.14159*pow(atomicRadius/b, 3); //Atomic volume in b units ---> Use the pre-determined atomic volume
 
-		double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
+	double segmentLength = L1/(numNodes-1); //Individual dislocation segment length in b units
 
-		double h = ( atomicVolumeinb/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
+	double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
 
-		//DisStruct.nodePositions[node1][0]+=-h;
+	double h = ( atomicVolumeinb*(1+volumetricStrain)/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
 
-		//DisStruct.nodePositions[node2][0]+=-h;
+	DisStruct.nodePositions[node1][0]+=-h; //Correct negative climb amount
 
-		DisStruct.nodePositions[node1][0]+=-10;
+	DisStruct.nodePositions[node2][0]+=-h; //Correct negative climb amount
 
-		DisStruct.nodePositions[node2][0]+=-10;
-		/////////////////////////////////////////////////////////////////////////////////////////
-		/////////////////////////////////////////////////////////////////////////////////////////
+	//DisStruct.nodePositions[node1][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+
+	//DisStruct.nodePositions[node2][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	/////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////
 		
 
 	////////Add a vacancy somewhere in the mesh and initialize it////////
@@ -950,11 +958,11 @@ void vacancyEmission(vector<Vacancy> &vacancyArray, DislocationStructure& DisStr
 	int numVacancies = static_cast<int>(vacancyArray.size()); //Number of vacancies currently in the mesh
 	double currentVacancyConcentration = numVacancies/simVolume; //Current calculated vacancy concentration
 
-	double formationEnthalpy = vacFormationEnergy - appliedPressure*(1+volumetricStrain); //Stress-dependent vacancy formation energy
+	double formationEnthalpy = vacFormationEnergy - appliedPressure*(1+volumetricStrain)*atomicVolume; //Stress-dependent vacancy formation energy
 	
 	double thermalVacConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) *pow(100,3); //Thermal concentration of vacancies considering current stress state
 
-	double emissionRate = 2*3.1415* simVolume * dislocationDensity * v*exp(-Eo/(Kb*Temp)) * (1 - currentVacancyConcentration/thermalVacConcentration) / b; //Calculation of the emission rate!
+	double emissionRate = 2*3.1415* simVolume * dislocationDensity * v*exp(-Eo/(Kb*Temp)) * (1 - currentVacancyConcentration/thermalVacConcentration) / b; //Calculation of the emission rate! in vacs/sec
 
 	std::cout << "Checking for Vacancy Emissions..." << std::endl;
 	std::cout << "Thermal Vacancy Concentration [ideal] = " << thermalVacConcentration << " vacs/m^3" << std::endl;
