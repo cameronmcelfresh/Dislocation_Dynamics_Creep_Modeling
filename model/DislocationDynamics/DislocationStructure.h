@@ -816,7 +816,7 @@ void remeshEmission(DislocationStructure& DisStruct)
 }
 
 template <typename Vacancy>
-void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruct)
+void emissionEventGlobal(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruct)
 //Function to facilitate the negative climb and addition of a new vacancy to the simulation box
 {
 
@@ -948,45 +948,228 @@ void emissionEvent(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruc
 	////////////////////////////////////////////////////////////////////
 }
 
+template <typename Vacancy>
+void emissionEventLocal(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruct, int node1, int node2)
+//Function to facilitate the negative climb and addition of a new vacancy to the simulation box
+{
+			
+	/////////////////////////////////////////////////////////////////////////////////////////				
+	//Execute NEGATIVE CLIMB of the segment that the vacancy was absorbed into - via movement of the two segment
+	/////////////////////////////////////////////////////////////////////////////////////////
+
+	//double atomicVolume = (4/3)*3.14159*pow(atomicRadius/b, 3); //Atomic volume in b units ---> Use the pre-determined atomic volume
+
+	double segmentLength = L1/(numNodes-1); //Individual dislocation segment length in b units
+
+	double atomicVolumeinb = atomicVolume*pow(b,-3); //Atomic volume in b units
+
+	double h = ( atomicVolumeinb*(1+volumetricStrain)/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
+
+	DisStruct.nodePositions[node1][0]+=-h; //Correct negative climb amount
+
+	DisStruct.nodePositions[node2][0]+=-h; //Correct negative climb amount
+
+	//DisStruct.nodePositions[node1][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+
+	//DisStruct.nodePositions[node2][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	/////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////
+		
+
+	////////Add a vacancy somewhere in the mesh and initialize it////////
+	std::uniform_real_distribution<double> L1Dist(-L1/2,L1/2);
+	std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
+	std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
+
+	double pos[3]; 
+
+	pos[0] = L1Dist(generator);	
+	pos[1] = L2Dist(generator);	
+	pos[2] = L3Dist(generator);	
+
+	Vacancy newVacancy;//Create	
+
+	vacancyArray.insert(vacancyArray.begin(),newVacancy ); //Add a vacancy to the current vector of vacancies
+
+	for(int i = 0; i<3; i++)
+		vacancyArray[0].position[i] = pos[i]*b;
+
+	vacancyArray[0].initializeVacancy(DisStruct); //initialize the vacancy!
+	
+	RunningVacIDnum++;
+	
+	vacancyArray[0].vacIDnum=RunningVacIDnum;
+	////////////////////////////////////////////////////////////////////
+
+	////////////////////////////////////////////////////////////////////
+	remeshEmission(DisStruct); //Function to remesh the dislocation structure after an emission event
+	////////////////////////////////////////////////////////////////////
+}
+
 
 template <typename Vacancy>
 void vacancyEmission(vector<Vacancy> &vacancyArray, DislocationStructure& DisStruct, double timeStep)
 //Function to randomly emit vacancies from the dislocation segments based on temperature, stress, and the global vacancy concentration
 {
+	std::cout << "Checking for Vacancy Emissions..." << std::endl;
+
 	double dislocationDensity = 1/(L1*L2*pow(b,2)); //Dislocation density [m^-2]
 	double simVolume = L1*L2*L3*pow(b,3); //Total mesh volume
 	int numVacancies = static_cast<int>(vacancyArray.size()); //Number of vacancies currently in the mesh
 	double currentVacancyConcentration = numVacancies/simVolume; //Current calculated vacancy concentration
 
-	double formationEnthalpy = vacFormationEnergy - appliedPressure*(1+volumetricStrain)*atomicVolume; //Stress-dependent vacancy formation energy
-	
-	double thermalVacConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) *pow(100,3); //Thermal concentration of vacancies considering current stress state
 
-	double emissionRate = 2*3.1415* simVolume * dislocationDensity * v*exp(-Eo/(Kb*Temp)) * (1 - currentVacancyConcentration/thermalVacConcentration) / b; //Calculation of the emission rate! in vacs/sec
+	if(useDiscreteEmission==0) //Use global-averaging emission
+	{
 
-	std::cout << "Checking for Vacancy Emissions..." << std::endl;
-	std::cout << "Thermal Vacancy Concentration [ideal] = " << thermalVacConcentration << " vacs/m^3" << std::endl;
-	std::cout << "Actual Vacancy Concentration = " << currentVacancyConcentration << " vacs/m^3" << std::endl;
-	std::cout << "Emission rate = " << emissionRate << " vacs/s" << std::endl;
+		double formationEnthalpy = vacFormationEnergy - appliedPressure*(1+volumetricStrain)*atomicVolume; //Stress-dependent vacancy formation energy
+		
+		double thermalVacConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) *pow(100,3); //Thermal concentration of vacancies considering current stress state
 
-	if (emissionRate>0)
-		{
-			std::cout << "Timestep = " << timeStep << " --> Emission probability = " << emissionRate*timeStep*100 << "%" << std::endl;
+		std::cout << "Thermal Vacancy Concentration [ideal] = " << thermalVacConcentration << " vacs/m^3" << std::endl;
+		std::cout << "Actual Vacancy Concentration = " << currentVacancyConcentration << " vacs/m^3" << std::endl;
+		
+		double emissionRate = 2*3.1415* simVolume * dislocationDensity * v*exp(-Eo/(Kb*Temp)) * (1 - currentVacancyConcentration/thermalVacConcentration) / b; //Calculation of the emission rate! in vacs/sec
 
-			if (emissionRate*timeStep>ZeroOnedistribution(generator)) //Only consider vacancy emission if the event is randomly selected
+		if (emissionRate>0)
 			{
-				RunningVacEmitted++;
-				std::cout <<"1 vacancy emitted" << std::endl;
 
-				emissionEvent(vacancyArray,DisStruct);  //Perform the negative climb and new vacancy addition
-				
+				std::cout << "Emission rate = " << emissionRate << " vacs/s" << std::endl;
+				std::cout << "Timestep = " << timeStep << " --> Emission probability = " << emissionRate*timeStep*100 << "%" << std::endl;
+
+				if (emissionRate*timeStep>ZeroOnedistribution(generator)) //Only consider vacancy emission if the event is randomly selected
+				{
+					RunningVacEmitted++;
+					std::cout <<"1 vacancy emitted - global average emission" << std::endl;
+
+					emissionEventGlobal(vacancyArray,DisStruct);  //Perform the negative climb and new vacancy addition
+					
+				}
+				else
+					std::cout <<"No vacancy emitted" << std::endl;
+		
 			}
-			else
-				std::cout <<"No vacancy emitted" << std::endl;
-	
+		else
+	 		std::cout << "Timestep = " << timeStep << " --> Emission probability = 0" << "%" << std::endl;
+
+	}
+
+
+	if(useDiscreteEmission==1) //Use discrete-segment vacancy emission
+	{
+
+		double segmentLength = L1/(numNodes-1); //Length of each individual EDGE dislocation segment
+		
+		for( auto const& [key, val] : DisStruct.nodeConnectivity) //Loop through the dislocation segments and use the local stress to see if any emissions occur
+			{
+
+				if(key[0]==key[1])
+				{
+				//std::cout << " Test 2" << std::endl;
+				continue; //Sanity Check
+				}
+
+				double z_dif = abs(DisStruct.nodePositions[key[0]][2] - DisStruct.nodePositions[key[1]][2]);
+
+				if( (z_dif==0) || (val[1]==1) ) //Skip through until a proper edge segment is randomly selected
+					{
+					//std::cout << " Test 3" << std::endl;
+					continue;
+					}
+
+				//Get the local stress at the middle of the segment
+				double midPoint[3];	
+				double tempMat[3][3];
+				double stressMat[3][3];
+				stressMat[0][0]=0;
+				stressMat[1][1]=0;
+				stressMat[2][2]=0;
+				
+				midPoint[0] = (DisStruct.nodePositions[key[0]][0] + DisStruct.nodePositions[key[1]][0])/2;
+				midPoint[1] = (DisStruct.nodePositions[key[0]][1] + DisStruct.nodePositions[key[1]][1])/2;
+				midPoint[2] = (DisStruct.nodePositions[key[0]][2] + DisStruct.nodePositions[key[1]][2])/2;
+				
+				std::cout <<"Midpoint at : " << midPoint[0] << " , " << midPoint[1] << " , " << midPoint[2] << std::endl;
+
+				int node1 = key[0];
+				int node2 = key[1];
+
+
+				for(int j = 0; j<2; j++) //Take a 4-point average of the stress at the midpoint of the dislocation
+					{
+						midPoint[0] = midPoint[0]+1*pow(-1,j);
+						DSpositionToAppliedStress(midPoint, DisStruct,tempMat, node1, node2); //Get the local stress - this accounts for the applied pressure and ignores the self-contributions from this dislocation segment
+						stressMat[0][0] = stressMat[0][0] + tempMat[0][0]/4;	
+						stressMat[1][1] = stressMat[1][1] + tempMat[1][1]/4;	
+						stressMat[2][2] = stressMat[2][2] + tempMat[2][2]/4;
+						midPoint[0] = midPoint[0]-1*pow(-1,j);
+						
+						for(int k = 0;k<3;k++)
+							for(int m=0;m<3;m++)
+								tempMat[k][m]=0; //Empty the temp stress matrix
+
+						midPoint[1] = midPoint[1]+1*pow(-1,j);
+						DSpositionToAppliedStress(midPoint, DisStruct,tempMat, node1, node2); //Get the local stress - this accounts for the applied pressure and ignores the self-contributions from this dislocation segment
+						stressMat[0][0] = stressMat[0][0] + tempMat[0][0]/4;	
+						stressMat[1][1] = stressMat[1][1] + tempMat[1][1]/4;	
+						stressMat[2][2] = stressMat[2][2] + tempMat[2][2]/4;
+						midPoint[1] = midPoint[1]-1*pow(-1,j);
+					}
+
+				double stressTrace = stressMat[0][0]+stressMat[1][1]+stressMat[2][2]; //calculate the trace
+
+				std::cout << "Diagonal Stresses: " << stressMat[0][0] << " " <<stressMat[1][1] << " " << stressMat[2][2] << std::endl;
+			
+				double formationEnthalpy = vacFormationEnergy - (stressTrace)*(1+volumetricStrain)*atomicVolume; //Local+Gloabl stress-dependent vacancy formation energy
+				
+				std::cout << "Vac Formation Enthalpy  = " << formationEnthalpy << " [J] - considering PK force" << std::endl;
+
+				double thermalVacConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) *pow(100,3); //Thermal concentration of vacancies considering current stress state
+				std::cout << "Local Ideal Vac Concentration  = " << thermalVacConcentration << " [vacs/m^3] - considering PK force" << std::endl;
+
+				int  localVacancies=0; //The number of vacancies within 
+
+				for( int i = 0; i<vacancyArray.size(); i++) //Loop through the dislocation segments and use the local stress to see if any emissions occur
+					{
+						//Calculate the distance from the local vacancies as radius to the segmnet midpoint
+						double difX = midPoint[0] - vacancyArray[i].position[0]/b;
+						double difY = midPoint[1] - vacancyArray[i].position[1]/b;
+						double difZ = midPoint[2] - vacancyArray[i].position[2]/b;
+
+						std::cout << "	Vac at : " << vacancyArray[i].position[0]/b << ", " << vacancyArray[i].position[1]/b; 
+						std::cout << ", " << vacancyArray[i].position[2]/b << " is " << pow(pow(difX,2) + pow(difY, 2) + pow(difZ,2),0.5) << " from segment" << std::endl;
+					
+						if(pow(pow(difX,2) + pow(difY, 2) + pow(difZ,2),0.5) < segmentLength*1.5) //Count every vacancy that is within 1.5 segment length from the midpoint
+							localVacancies++;
+
+					}
+
+					double localVacancyConcentration = localVacancies/(3.1415*pow(segmentLength*1.5,3)*pow(b,3)*4/3); //The local vacancy concentration within segmentlength distance
+
+					double discreteEmissionRate = 2*3.1415*segmentLength * v*exp(-Eo/(Kb*Temp)) * (1 - localVacancyConcentration/thermalVacConcentration) ; //Calculation of the emission rate! in vacs/sec
+					std::cout <<"Discrete Emission Rate = " << discreteEmissionRate << "[vacs/s]" << std::endl;
+					std::cout << "Segment " << key[0] << " ---> " << key[1] << " : " << localVacancies << " vacs ---> " << localVacancyConcentration << " [vacs/m^3] local" << std::endl;
+					std::cout << "Timestep = " << timeStep << " --> Emission probability = " << discreteEmissionRate*timeStep*100 << "%" << std::endl;
+
+				if (discreteEmissionRate*timeStep>ZeroOnedistribution(generator)) //Only consider vacancy emission if the event is randomly selected
+				{
+					RunningVacEmitted++;
+					std::cout <<"1 vacancy emitted - discrete emission" << std::endl;
+					
+					int nodeID1 = key[0];
+					int nodeID2 = key[1]; //The IDs of the 2 nodes that are emitting a vacancy
+
+					emissionEventLocal(vacancyArray,DisStruct, nodeID1, nodeID2);  //Perform the negative climb and new vacancy addition
+					
+				}
+				else
+					std::cout <<"No vacancy emitted" << std::endl;
+
+			}
+
+		
+
 		}
-	else
- 		std::cout << "Timestep = " << timeStep << " --> Emission probability = 0" << "%" << std::endl;
 
 
 	std::cout <<"Total Vacancies Emitted = " << RunningVacEmitted << std::endl;

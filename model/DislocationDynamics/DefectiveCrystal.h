@@ -514,7 +514,7 @@ namespace model
 	}
 
 	////Populate the Dislocation Structure////
-	if (simulationParameters.runID=1 && useParametricStudy==0) 
+	if (simulationParameters.runID==1 && useParametricStudy==0) 
 		{
 		DisStruct.readNodesAndSegments(simulationParameters.runID-1);
 		}

@@ -281,82 +281,6 @@ void DSpositionToAppliedStress(double pos[3], DislocationStructure DS,double app
 	Eigen::Matrix<double,3,1> p1;
 	Eigen::Matrix<double,3,1> burgers;
 
-
-
-/*
-	//Attempt #1
-	for( auto const& [key, val] : DS.nodeConnectivity )
-	{
-
-	//Ignore the forces of all connecting segments to simulate an "infinite" dislocation
-	//if (val[1]==1)
-	//	continue;
-
-
-	//Node 0 Positions
-	p0(0) = DS.nodePositions[key[0]][0];
-	p0(1) = DS.nodePositions[key[0]][1];
-	p0(2) = DS.nodePositions[key[0]][2];
-
-	//std::cout << "p0 " << p0 << std::endl;
-	
-	//Node 1 Positions
-	p1(0) = DS.nodePositions[key[1]][0];
-	p1(1) = DS.nodePositions[key[1]][1];
-	p1(2) = DS.nodePositions[key[1]][2];
-
-	//std::cout << "p1 " << p1 << std::endl;
-
-	burgers(0) = DS.loops[val[0]][0];
-	burgers(1) = DS.loops[val[0]][1];
-	burgers(2) = DS.loops[val[0]][2];
-
-	//std::cout << "burgers " << std::endl;
-	//std::cout << burgers << std::endl;
-
-	std::cout << "Calculating stress contribution from node " << key[0] << " ("<< p0(0) <<"," << p0(1) << "," << p0(2) << ") to " << key[1] << " ("<< p1(0) <<"," << p1(1) << "," << p1(2) << ")" << std::endl;
-
-	//straightArmStress(p0, p1, burgers, positionVec, tempMat); //Call a stress function to return the stress give a dislocation start/ending point and a position point
-
-
-	Eigen::Matrix<double,3,1> p2;
-	//Node 3 Positions
-	p2(0) = DS.nodePositions[key[1]+1][0];
-	p2(1) = DS.nodePositions[key[1]+1][1];
-	p2(2) = DS.nodePositions[key[1]+1][2];
-	StressStraight straightSegment1 = StressStraight(p1, p2, burgers); //Create a dislocation arm and calculate the stress from it given a position
-	std::cout << "Tempmat +1" << std::endl;
-	Eigen::Matrix<double,3,3> tempMat1;
-	tempMat1 = straightSegment1.stress(positionVec);
-	std::cout << tempMat1 << std::endl;
-
-	///////////TEST////////////
-
-
-	StressStraight straightSegment = StressStraight(p0, p1, burgers); //Create a dislocation arm and calculate the stress from it given a position
-
-
-	//tempMat = straightSegment.stress(positionVec);
-	tempMat = straightSegment.stress(positionVec);
-	////////////////////////
-
-	std::cout << "Tempmat" << std::endl;
-	std::cout << tempMat << std::endl;
-
-	//stressMat+=tempMat;
-
-	stressMat=stressMat + tempMat;
-
-	std::cout << "Cumulative stressmat" << std::endl;
-	std::cout << stressMat << std::endl;
-
-	//for(int i=0;i<3;i++)
-	//	for(int j = 0; j<3; j++)
-	//		tempMat(i,j) = 0;
-
-	}
-*/
-
 	//Attempt #2
 	//StressStraight segments[numNodes+1]; 
 	for(int i = 0;i<DS.nodePositions.size()-1;i++)
@@ -413,22 +337,32 @@ void DSpositionToAppliedStress(double pos[3], DislocationStructure DS,double app
 }
 
 template <typename DislocationStructure>
-void DSpositionToPeriodicStress(double pos[3], DislocationStructure DS,double appliedStress[][3])
+void DSpositionToAppliedStress(double pos[3], DislocationStructure DS,double appliedStress[][3], int skipNode1, int skipNode2)
 {
 	using namespace model;
+
 
 	Eigen::Matrix<double,3,1> positionVec(pos[0]/b,pos[1]/b,pos[2]/b);
 
 	Eigen::Matrix<double,3,3> stressMat(Eigen::Matrix<double,3,3>::Zero());
 
 	Eigen::Matrix<double,3,3> tempMat;
-	Eigen::Matrix<double,3,1> p0;  //Start of the dislocation segment
-	Eigen::Matrix<double,3,1> p1;  //End of the dislocation segment
+	Eigen::Matrix<double,3,1> p0;
+	Eigen::Matrix<double,3,1> p1;
 	Eigen::Matrix<double,3,1> burgers;
 
-
+	//Attempt #2
+	//StressStraight segments[numNodes+1]; 
 	for(int i = 0;i<DS.nodePositions.size()-1;i++)
 	{
+		 
+		//Use the provided node numbers to know which nodes to skip for calculation of the dislocation loop self-forces
+		if( ( (DS.nodePositions[i][0] == DS.nodePositions[skipNode1][0] && DS.nodePositions[i][1] == DS.nodePositions[skipNode1][1] && DS.nodePositions[i][2] == DS.nodePositions[skipNode1][2]) && (DS.nodePositions[i+1][0] == DS.nodePositions[skipNode2][0] && DS.nodePositions[i+1][1] == DS.nodePositions[skipNode2][1] && DS.nodePositions[i+1][2] == DS.nodePositions[skipNode2][2]) ) || ( (DS.nodePositions[i][0] == DS.nodePositions[skipNode2][0] && DS.nodePositions[i][1] == DS.nodePositions[skipNode2][1] && DS.nodePositions[i][2] == DS.nodePositions[skipNode2][2]) && (DS.nodePositions[i+1][0] == DS.nodePositions[skipNode1][0] && DS.nodePositions[i+1][1] == DS.nodePositions[skipNode1][1] && DS.nodePositions[i+1][2] == DS.nodePositions[skipNode1][2]) ) )
+			{
+			std::cout << "Skipping segment " << skipNode1 << " ---> " << skipNode2 << std::endl;
+			continue;	
+			}
+
 
 		int i2 = i+1;
 		if(i2>DS.nodePositions.size()-1)
@@ -453,29 +387,15 @@ void DSpositionToPeriodicStress(double pos[3], DislocationStructure DS,double ap
 
 		//std::cout << "Calculating stress contribution from node " << i << " ("<< p0(0) <<"," << p0(1) << "," << p0(2) << ") to " << i2 << " ("<< p1(0) <<"," << p1(1) << "," << p1(2) << ")" << std::endl;
 
-				
-
 		tempMat = StressStraight(p0, p1, burgers).stress(positionVec);
 
 		//std::cout << "Tempmat" << std::endl;
 		//std::cout << tempMat << std::endl;
 
+		//stressMat+=tempMat;
 
-		stressMat=stressMat + tempMat; //Stress from original segment
+		stressMat=stressMat + tempMat;
 
-		
-		for(int j = 1;j< numImages;j++) //Now add a stress from the same segment, but repeated in images above and below the simulation box
-		{
-			p0(3) = p0(3) + j*L3;
-			p1(3) = p1(3) + j*L3;
-
-			stressMat = stressMat + StressStraight(p0, p1, burgers).stress(positionVec);
-
-			p0(3) = p0(3) - j*L3;
-			p1(3) = p1(3) - j*L3;
-
-			stressMat = stressMat + StressStraight(p0, p1, burgers).stress(positionVec);
-		}
 		//std::cout << "Cumulative stressmat" << std::endl;
 		//std::cout << stressMat << std::endl;
 	}
@@ -483,6 +403,15 @@ void DSpositionToPeriodicStress(double pos[3], DislocationStructure DS,double ap
 	for(int i=0;i<3;i++)
 		for(int j = 0; j<3; j++)
 			appliedStress[i][j]=stressMat(i,j)*G;
+
+	
+	if( (useParametricStudy==1) && (useStress==1) ) //If performaing a parametric study with applied stress, factor in the applied stress.  
+	{
+		appliedStress[0][0] = appliedStress[0][0] + appliedPressure/3; 
+		appliedStress[1][1] = appliedStress[1][1] + appliedPressure/3; 
+		appliedStress[2][2] = appliedStress[2][2] + appliedPressure/3; 
+	}
+
 }
 
 
