@@ -359,7 +359,7 @@ void DSpositionToAppliedStress(double pos[3], DislocationStructure DS,double app
 		//Use the provided node numbers to know which nodes to skip for calculation of the dislocation loop self-forces
 		if( ( (DS.nodePositions[i][0] == DS.nodePositions[skipNode1][0] && DS.nodePositions[i][1] == DS.nodePositions[skipNode1][1] && DS.nodePositions[i][2] == DS.nodePositions[skipNode1][2]) && (DS.nodePositions[i+1][0] == DS.nodePositions[skipNode2][0] && DS.nodePositions[i+1][1] == DS.nodePositions[skipNode2][1] && DS.nodePositions[i+1][2] == DS.nodePositions[skipNode2][2]) ) || ( (DS.nodePositions[i][0] == DS.nodePositions[skipNode2][0] && DS.nodePositions[i][1] == DS.nodePositions[skipNode2][1] && DS.nodePositions[i][2] == DS.nodePositions[skipNode2][2]) && (DS.nodePositions[i+1][0] == DS.nodePositions[skipNode1][0] && DS.nodePositions[i+1][1] == DS.nodePositions[skipNode1][1] && DS.nodePositions[i+1][2] == DS.nodePositions[skipNode1][2]) ) )
 			{
-			std::cout << "Skipping segment " << skipNode1 << " ---> " << skipNode2 << std::endl;
+			//std::cout << "Skipping segment " << skipNode1 << " ---> " << skipNode2 << std::endl;
 			continue;	
 			}
 

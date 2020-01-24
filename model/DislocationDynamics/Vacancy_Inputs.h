@@ -36,8 +36,8 @@ int numNodes = 14; //Number of nodes to discretize across the straight dislocati
 double fractZOverhang = .1; //Fraction of the total z-length that the z-length straight dislocaiton extends above and below the simulation box
 double fractXOverhang = .2; //Fraction of the total x-length that the dislocation loop extends beyond the simulation box
 int DisStructUpdateFreq = 5; //Number of runID trials between updating the DislocationStructure and absorbing vacancies
-int PrintStatsFreq = 1000; //Frequency of outputting the test statistics
-int PrintEVLFreq = 10000; //Frequency of outputting the evl file
+int PrintStatsFreq = 25000; //Frequency of outputting the test statistics
+int PrintEVLFreq = 100000; //Frequency of outputting the evl file
 
 int kmcAcceptableError = 30; //Acceptable percentage error for self-guess of kMC timestep
 int outputGlobalTimeStep = 0; //1=true or 0=false for printing globaltimestep file -- printed in "test" folder
@@ -99,7 +99,7 @@ uniform_real_distribution<double> Stepdistribution(minVacJump, maxVacJump); //Un
 
 ////////Parametric Testing of Climb Parameters////////
 int useParametricStudy = 1; //0=run non-parametric study, 1 = run parametric study by varying the variables listed below
-int DDSimulationText=1; //0=minimal output from the DD module, 1=full DD and vacancy simulation text output
+int DDSimulationText=0; //0=minimal output from the DD module, 1=full DD and vacancy simulation text output
 
 int dynamicBoxResizing = 1; //0=do not dynamically resize the box to maintain a constant vacancy number, 1 = resize box as to keep a constant vacancy number throughout the parametric study
 int constVacNumber = 100; //Number of vacancies to consider for each trial of the parametric stdy IF dynamicBoxResizing==1

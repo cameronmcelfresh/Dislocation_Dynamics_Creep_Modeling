@@ -975,19 +975,34 @@ void emissionEventLocal(vector<Vacancy> &vacancyArray, DislocationStructure& Dis
 	/////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////
 		
+	
+	//Get the coordinates of the end of the dislocation segments and place the vacancy within the L distance but outside of the capture radius
+	double xMin = min(DisStruct.nodePositions[node1][0], DisStruct.nodePositions[node2][0]);
+	double xMax= max(DisStruct.nodePositions[node1][0], DisStruct.nodePositions[node2][0]);	
 
-	////////Add a vacancy somewhere in the mesh and initialize it////////
-	std::uniform_real_distribution<double> L1Dist(-L1/2,L1/2);
-	std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
-	std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
+	double yMin = min(DisStruct.nodePositions[node1][1], DisStruct.nodePositions[node2][1]);
+	double yMax= max(DisStruct.nodePositions[node1][1], DisStruct.nodePositions[node2][1]);
+
+	double zMin = min(DisStruct.nodePositions[node1][2], DisStruct.nodePositions[node2][2]);
+	double zMax= max(DisStruct.nodePositions[node1][2], DisStruct.nodePositions[node2][2]);
+
+	
+
+	////////Add a vacancy in the mesh and initialize it////////
+	std::uniform_real_distribution<double> xDist(xMin-segmentLength, xMax+segmentLength);
+	std::uniform_real_distribution<double> yDist(yMin-segmentLength,yMax+segmentLength);
+	std::uniform_real_distribution<double> zDist(zMin,zMax);
 
 	double pos[3]; 
 
-	pos[0] = L1Dist(generator);	
-	pos[1] = L2Dist(generator);	
-	pos[2] = L3Dist(generator);	
+	do{
+		pos[0] = xDist(generator);	
+		pos[1] = yDist(generator);	
+		pos[2] = zDist(generator); //Ensure that the newly placed vancay is within the segment length distance from the dislocation core AND further than the capture radius
 
-	Vacancy newVacancy;//Create	
+	} while(pow( pow(pos[0]-xMin,2) + pow(pos[1]-yMin,2) + pow(pos[2]-zMin,2) , 0.5) <  segmentLength &&  pow( pow(pos[0]-xMin,2) + pow(pos[1]-yMin,2) + pow(pos[2]-zMin,2) , 0.5) >  distToAbsorbption);
+	
+	Vacancy newVacancy;//Create new vacancy
 
 	vacancyArray.insert(vacancyArray.begin(),newVacancy ); //Add a vacancy to the current vector of vacancies
 
@@ -1087,9 +1102,13 @@ void vacancyEmission(vector<Vacancy> &vacancyArray, DislocationStructure& DisStr
 				
 				midPoint[0] = (DisStruct.nodePositions[key[0]][0] + DisStruct.nodePositions[key[1]][0])/2;
 				midPoint[1] = (DisStruct.nodePositions[key[0]][1] + DisStruct.nodePositions[key[1]][1])/2;
-				midPoint[2] = (DisStruct.nodePositions[key[0]][2] + DisStruct.nodePositions[key[1]][2])/2;
+				midPoint[2] = (DisStruct.nodePositions[key[0]][2] + DisStruct.nodePositions[key[1]][2])/2; //Calcualte the midpoint of the dislocation segment to use for calcualtion of stress on the dislocation
+
+				double zMin = min(DisStruct.nodePositions[key[0]][2], DisStruct.nodePositions[key[1]][2]);
+				double zMax= max(DisStruct.nodePositions[key[0]][2], DisStruct.nodePositions[key[1]][2]); //Extract the minimum and maximum of the z-values for the segment
+
 				
-				std::cout <<"Midpoint at : " << midPoint[0] << " , " << midPoint[1] << " , " << midPoint[2] << std::endl;
+				//std::cout <<"Midpoint at : " << midPoint[0] << " , " << midPoint[1] << " , " << midPoint[2] << std::endl;
 
 				int node1 = key[0];
 				int node2 = key[1];
@@ -1118,38 +1137,48 @@ void vacancyEmission(vector<Vacancy> &vacancyArray, DislocationStructure& DisStr
 
 				double stressTrace = stressMat[0][0]+stressMat[1][1]+stressMat[2][2]; //calculate the trace
 
-				std::cout << "Diagonal Stresses: " << stressMat[0][0] << " " <<stressMat[1][1] << " " << stressMat[2][2] << std::endl;
+				//std::cout << "Diagonal Stresses: " << stressMat[0][0] << " " <<stressMat[1][1] << " " << stressMat[2][2] << std::endl;
 			
 				double formationEnthalpy = vacFormationEnergy - (stressTrace)*(1+volumetricStrain)*atomicVolume; //Local+Gloabl stress-dependent vacancy formation energy
 				
-				std::cout << "Vac Formation Enthalpy  = " << formationEnthalpy << " [J] - considering PK force" << std::endl;
+				//std::cout << "Vac Formation Enthalpy  = " << formationEnthalpy << " [J] - considering PK force" << std::endl;
 
 				double thermalVacConcentration = (density*Na*1*exp(-1*formationEnthalpy/(Temp*Kb))/molarMass ) *pow(100,3); //Thermal concentration of vacancies considering current stress state
-				std::cout << "Local Ideal Vac Concentration  = " << thermalVacConcentration << " [vacs/m^3] - considering PK force" << std::endl;
+				//std::cout << "Local Ideal Vac Concentration  = " << thermalVacConcentration << " [vacs/m^3] - considering PK force" << std::endl;
 
-				int  localVacancies=0; //The number of vacancies within 
+				int  localVacancies=0; //The number of vacancies within local 
 
 				for( int i = 0; i<vacancyArray.size(); i++) //Loop through the dislocation segments and use the local stress to see if any emissions occur
 					{
-						//Calculate the distance from the local vacancies as radius to the segmnet midpoint
+						//Calculate the distance from the local vacancies to the cylindical volume around the dislocation segment
 						double difX = midPoint[0] - vacancyArray[i].position[0]/b;
 						double difY = midPoint[1] - vacancyArray[i].position[1]/b;
-						double difZ = midPoint[2] - vacancyArray[i].position[2]/b;
 
-						std::cout << "	Vac at : " << vacancyArray[i].position[0]/b << ", " << vacancyArray[i].position[1]/b; 
-						std::cout << ", " << vacancyArray[i].position[2]/b << " is " << pow(pow(difX,2) + pow(difY, 2) + pow(difZ,2),0.5) << " from segment" << std::endl;
+						//std::cout << "	Vac at : " << vacancyArray[i].position[0]/b << ", " << vacancyArray[i].position[1]/b; 
+						//std::cout << ", " << vacancyArray[i].position[2]/b << " is " << pow(pow(difX,2) + pow(difY, 2) ,0.5) << " from segment - ";
 					
-						if(pow(pow(difX,2) + pow(difY, 2) + pow(difZ,2),0.5) < segmentLength*1.5) //Count every vacancy that is within 1.5 segment length from the midpoint
-							localVacancies++;
+						if(vacancyArray[i].position[2]/b>zMin && vacancyArray[i].position[2]/b <zMax) //Only count vacancies within the z-min and z-max of the dislocation segment
+							{
+								//std::cout << " within z-bounds of dislocation segment" << std::endl;
 
+								if(pow(pow(difX,2) + pow(difY, 2),0.5) < segmentLength) //Count every vacancy that is within 1 segment length from
+									{
+									//std::cout<< "		close enough b/c " << pow(pow(difX,2) + pow(difY, 2),0.5) << " < "<<  segmentLength << std::endl;
+									localVacancies++;
+									}
+							}
+						else
+							{
+							//std::cout << " out of bounds of dislocation segment" << std::endl;
+							}
 					}
 
 					double localVacancyConcentration = localVacancies/(3.1415*pow(segmentLength*1.5,3)*pow(b,3)*4/3); //The local vacancy concentration within segmentlength distance
 
 					double discreteEmissionRate = 2*3.1415*segmentLength * v*exp(-Eo/(Kb*Temp)) * (1 - localVacancyConcentration/thermalVacConcentration) ; //Calculation of the emission rate! in vacs/sec
-					std::cout <<"Discrete Emission Rate = " << discreteEmissionRate << "[vacs/s]" << std::endl;
-					std::cout << "Segment " << key[0] << " ---> " << key[1] << " : " << localVacancies << " vacs ---> " << localVacancyConcentration << " [vacs/m^3] local" << std::endl;
-					std::cout << "Timestep = " << timeStep << " --> Emission probability = " << discreteEmissionRate*timeStep*100 << "%" << std::endl;
+					//std::cout <<"Discrete Emission Rate = " << discreteEmissionRate << "[vacs/s]" << std::endl;
+					//std::cout << "Segment " << key[0] << " ---> " << key[1] << " : " << localVacancies << " vac(s) ---> " << localVacancyConcentration << " [vacs/m^3] local" << std::endl;
+					//std::cout << "Timestep = " << timeStep << " --> Emission probability = " << discreteEmissionRate*timeStep*100 << "%" << std::endl;
 
 				if (discreteEmissionRate*timeStep>ZeroOnedistribution(generator)) //Only consider vacancy emission if the event is randomly selected
 				{
@@ -1163,8 +1192,9 @@ void vacancyEmission(vector<Vacancy> &vacancyArray, DislocationStructure& DisStr
 					
 				}
 				else
-					std::cout <<"No vacancy emitted" << std::endl;
-
+					{
+					//std::cout <<"No vacancy emitted" << std::endl;
+					}
 			}
 
 		
