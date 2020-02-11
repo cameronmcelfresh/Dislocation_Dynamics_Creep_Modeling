@@ -51,7 +51,7 @@ void DislocationStructure::readNodesAndSegments(int runID)
 
 	std::cout << "Updating DislocationStructure..." << std::endl;
 
-	int IDnum = runID-1;
+	int IDnum = runID;
 	std::string fileString= "./evl/evl_" + std::to_string(IDnum) + ".txt";  //Creates file name based on the current runID
 	//std::cout << fileString << std::endl;
 

@@ -483,8 +483,8 @@ namespace model
 
 	auto tV= std::chrono::system_clock::now();
 
-	//Initialize the vacancies to the dislocation network on runID = 1...
-	if (simulationParameters.runID==1)
+	//Initialize the vacancies to the dislocation structure on runID = 1...
+	if (simulationParameters.runID==1 && useParametricStudy==1)
 	{	
 		std::cout << "Initializing vacancies..." << std::endl;
 		std::cout << "Vacancy Concentration = " <<vacancyConcentration<< " vac/m^3" << std::endl;
@@ -513,10 +513,44 @@ namespace model
 		
 	}
 
-	////Populate the Dislocation Structure////
-	if (simulationParameters.runID==1 && useParametricStudy==0) 
+	//Initialize the vacancies to the dislocation network on runID = 1...
+	if (simulationParameters.runID==1 && useParametricStudy==0)
+	{	
+		std::cout << "Initializing vacancies..." << std::endl;
+		std::cout << "Vacancy Concentration = " <<vacancyConcentration<< " vac/m^3" << std::endl;
+		std::cout << "Number of vacancies in mesh = " <<vacNum<<  std::endl;
+
+		//std::default_random_engine generator;
+		std::uniform_real_distribution<double> L1Dist(-L1/2,L1/2);
+		std::uniform_real_distribution<double> L2Dist(-L3/2,L2/2);
+		std::uniform_real_distribution<double> L3Dist(-L3/2,L3/2);
+	
+		double pos[3];
+
+		for(int i = 0; i<vacNum;i++)
 		{
-		DisStruct.readNodesAndSegments(simulationParameters.runID-1);
+
+			pos[0] = L1Dist(generator);	
+			pos[1] = L2Dist(generator);	
+			pos[2] = L3Dist(generator);	
+
+			for(int j = 0; j<3;j++)
+				vacancies[i].position[j] = pos[j]*b;
+
+
+			vacancies[i].initializeVacancy(DN);
+		}
+		
+	}
+
+	////Populate the Dislocation Structure////
+	if ( (simulationParameters.runID==1 || ( (simulationParameters.runID-1)%DisStructUpdateFreq==0 && simulationParameters.runID>1) )  && useParametricStudy==0) 
+		{
+
+		if(simulationParameters.runID==1)
+			DisStruct.readNodesAndSegments(simulationParameters.runID-1); //Make sure to read in the initial evl_0.txt
+		else
+			DisStruct.readNodesAndSegments(simulationParameters.runID-1);
 		}
 
 
