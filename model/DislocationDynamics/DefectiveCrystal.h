@@ -565,12 +565,6 @@ namespace model
 		{
 		findVacancyIntersections(vacancies, DisStruct, DN);
 		}
-	
-	////Print test stats - dislocation velocity and vacancy statistics////
-	if ((simulationParameters.runID-1)%PrintStatsFreq==0 && simulationParameters.runID>1) 
-		{
-		printStatistics(DisStruct, simulationParameters.runID);
-		}
 
 
 	////Print the FIRST evl file so there is a evl_0.txt////
@@ -654,6 +648,27 @@ namespace model
             }
             simulationParameters.totalTime+=simulationParameters.dt;
             ++simulationParameters.runID;
+
+
+	////////////////////////////////////////////
+	/////////////CAMERON'S ADDITIONAL CODE - keep running time consistent with DD code
+	////////////////////////////////////////////
+
+	////Print test stats - dislocation velocity and vacancy statistics////
+	if ((simulationParameters.runID-1)%PrintStatsFreq==0 && simulationParameters.runID>1) 
+		{
+
+		double elapsedTime = (std::chrono::duration<double>(std::chrono::system_clock::now()-tV)).count();
+
+		RunningCPUTime+=elapsedTime;
+
+		printStatistics(DisStruct, simulationParameters.runID, RunningCPUTime);
+		}
+
+	////////////////////////////////////////////
+	////////////////////////////////////////////
+	////////////////////////////////////////////
+
         }
         
         /**********************************************************************/

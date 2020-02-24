@@ -817,6 +817,7 @@ void resetRunningVariables()
 	RunningLastVacEmitted=0; 
 	RunningBalancedVacs = 0; 
 	RunningVacIDnum = 0; 
+	RunningCPUTime = 0;
 	totalGlobalTime = 0; 
 	lastTotalGlobalTime = 0; 
 	lastDistanceMoved = 0; 

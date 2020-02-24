@@ -1925,7 +1925,8 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 
 				//std::cout << "Vac " << vacancyArray[i].vacIDnum << " closest segment is " << distanceInfo[0] << " b" << std::endl; 
 
-				if (distanceInfo[0]<distToAbsorbption)
+				//Only allow edge segments to absorb 
+				if (distanceInfo[0]<distToAbsorbption && abs(DisStruct.nodePositions[distanceInfo[1]][2]-DisStruct.nodePositions[distanceInfo[2]][2])>0  ) 
 					{
 					/////////////////////////////////////////////////////////////////////////////////////////
 					//Execute vacancy absorption and place the vacancy in a new position	
@@ -1970,11 +1971,11 @@ void findVacancyIntersections(vector<Vacancy> &vacancyArray, DislocationStructur
 
 					double h = ( atomicVolumeinb*(1+volumetricStrain)/ segmentLength); //Climb height in b units according to volume swept out by absorption of one vacancy
 
-					//DisStruct.nodePositions[distanceInfo[1]][0]+=10; //Incorrect climb amount - used for visalization purposes
+					//DisStruct.nodePositions[distanceInfo[1]][0]+=3; //Incorrect climb amount - used for visalization purposes
 					DisStruct.nodePositions[distanceInfo[1]][0]+=h; //Correct Climb amount
 
 
-					//DisStruct.nodePositions[distanceInfo[2]][0]+=10; //Incorrect climb amount - used for visalization purposes
+					//DisStruct.nodePositions[distanceInfo[2]][0]+=3; //Incorrect climb amount - used for visalization purposes
 					DisStruct.nodePositions[distanceInfo[2]][0]+=h; //Correct Climb amount
 				
 					

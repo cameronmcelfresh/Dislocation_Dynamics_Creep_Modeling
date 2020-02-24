@@ -447,7 +447,7 @@ void findClosestSegment(double position[3], DislocationStructure DS, double dist
 
 }
 
-void printStatistics(DislocationStructure DisStruct, long int runID)
+void printStatistics(DislocationStructure DisStruct, long int runID, double simulationParmTotalTime)
 //Function to print the running values of vacancies absorbed, dislocation velocity, timestep, and other relevant statistics
 {
 
@@ -523,6 +523,9 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 		
 
 	OutStatsStream << totalGlobalTime << " " << incrementalTimeStep << " " << totalDislocationVelocity << " " << incrementalDislocationVelocity << " "; //Print the total time, timestep, and dislcoation velocities
+
+	if (PrintCPUTime==1) //Print the total running CPU time if requested
+		OutStatsStream << simulationParmTotalTime;
 	
 	OutStatsStream << std::endl;
 	
@@ -560,6 +563,9 @@ void printStatistics(DislocationStructure DisStruct, long int runID)
 		OutStatsHeaderStream << "Incremental_Time [s]" << std::endl;
 		OutStatsHeaderStream << "Total_Avg_Dislocation_Velocity [m/s]" << std::endl;
 		OutStatsHeaderStream << "Incremental_Dislocation_Velocity [m/s]" << std::endl;
+
+		if (PrintCPUTime==1) //Print the total running CPU time if requested
+				OutStatsHeaderStream << "Total_CPU_Time [s]" << std::endl;
 
 		OutStatsHeaderStream.close();
 	}
@@ -911,9 +917,9 @@ void emissionEventGlobal(vector<Vacancy> &vacancyArray, DislocationStructure& Di
 
 	DisStruct.nodePositions[node2][0]+=-h; //Correct negative climb amount
 
-	//DisStruct.nodePositions[node1][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	//DisStruct.nodePositions[node1][0]+=-5; //Incorrect negative climb amount - used for visualization purposes
 
-	//DisStruct.nodePositions[node2][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	//DisStruct.nodePositions[node2][0]+=-5; //Incorrect negative climb amount - used for visualization purposes
 	/////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////
 		
@@ -969,9 +975,9 @@ void emissionEventLocal(vector<Vacancy> &vacancyArray, DislocationStructure& Dis
 
 	DisStruct.nodePositions[node2][0]+=-h; //Correct negative climb amount
 
-	//DisStruct.nodePositions[node1][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	//DisStruct.nodePositions[node1][0]+=-3; //Incorrect negative climb amount - used for visualization purposes
 
-	//DisStruct.nodePositions[node2][0]+=-10; //Incorrect negative climb amount - used for visualization purposes
+	//DisStruct.nodePositions[node2][0]+=-3; //Incorrect negative climb amount - used for visualization purposes
 	/////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////
 		
