@@ -64,13 +64,13 @@ int main (int argc, char* argv[])
 			//Set the number of DD steps to run (Nsteps variable) based on the simulation temperature
 			if(Temp<1200)
 				{
-				double newNsteps = 500100;
+				double newNsteps = 100000;
 				rewriteDD(newNsteps);
 				}
 
 			if(Temp>1200)
 				{
-				double newNsteps = 750100;
+				double newNsteps = 100000;
 				rewriteDD(newNsteps);
 				}
 
